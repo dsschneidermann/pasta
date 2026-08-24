@@ -25,12 +25,6 @@ _CODE_REF_KINDS = ("file", "function", "class", "type", "interface", "constant")
 _DEP_ROLES = ("depends-on", "exposes", "implements", "owns", "calls")
 
 
-_DETAILS = _blocks("body", block_kinds=("paragraph", "code"), description="""
-                Design notes that do not fit the fixed sections: rationale, trade-offs that were
-                considered and rejected, gotchas, and worked examples. Use a code block for anything a
-                reader would otherwise have to reconstruct from prose. Emphasis and links are
-                structured inline runs, not markdown syntax.
-                """)
 _ARCHITECTURE = PageType(
     tag="architecture",
     name="Architecture node",
@@ -74,7 +68,14 @@ _ARCHITECTURE = PageType(
                 through what path.
                 """)
         ,)),
-        SectionSpec("details", "Details", (_DETAILS,)),
+        SectionSpec("details", "Details", (
+            _blocks("body", block_kinds=("paragraph", "code"), description="""
+                Design notes that do not fit the fixed sections: rationale, trade-offs that were
+                considered and rejected, gotchas, and worked examples. Use a code block for anything a
+                reader would otherwise have to reconstruct from prose. Emphasis and links are
+                structured inline runs, not markdown syntax.
+                """),
+        )),
         SectionSpec("codeReferences", "Code references", (
             _list("items", element_fields=("file", "symbol", "kind"), description="""
                 Each a pointer into real source: the repo-relative file path, the symbol when the
@@ -115,7 +116,7 @@ _ARCHITECTURE = PageType(
         # `details` is a `blocks` field with a deliberately narrow surface: a prose note (inline
         # runs) or a code note, plus the universal remove/reorder.
         *blocks_cmds(
-            "details", _DETAILS,
+            "details",
             remove_name="removeNote", remove_desc="remove a note block",
             reorder_name="reorderNote",
             reorder_desc="move a note block to an anchored position (precedingId guards a stale read)"),

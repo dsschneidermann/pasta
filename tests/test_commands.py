@@ -662,7 +662,7 @@ def _field_setter_page_type() -> PageType:
         ),
         commands=(
             set_prose_cmd("overview", legal_in=("draft",)),
-            *blocks_cmds("design", _DESIGN_BODY, legal_in=("draft",)),
+            *blocks_cmds("design", legal_in=("draft",)),
             transition_cmd("markSealed", "draft -> sealed",
                            requires=(("overview", "body"), ("design", "body"))),
             add_link_cmd(), set_title_cmd(),
@@ -783,7 +783,7 @@ def _unified_blocks_page_type() -> PageType:
         tag="xtest-unified-blocks", name="Unified blocks fixture",
         description="ad-hoc fixture: one blocks field, one add and one set",
         sections=(SectionSpec("body", "Body", (body,)),),
-        commands=(*blocks_cmds("body", body), add_link_cmd(), set_title_cmd()),
+        commands=(*blocks_cmds("body"), add_link_cmd(), set_title_cmd()),
         fsm=FSMSpec(name="XTestUnifiedBlocks", initial="active", states=("active",)),
     )
 
@@ -937,7 +937,7 @@ def _table_blocks_page_type() -> PageType:
         tag="xtest-table-blocks", name="Table blocks fixture",
         description="ad-hoc fixture: an element block field accepting a table",
         sections=(SectionSpec("items", "Items", (items,)),),
-        commands=(*list_cmds("items", add_args=(_text(),), field_spec=items),
+        commands=(*list_cmds("items", add_args=(_text(),), element_blocks=("detail",)),
                   add_link_cmd(), set_title_cmd()),
         fsm=FSMSpec(name="XTestTableBlocks", initial="active", states=("active",)),
     )

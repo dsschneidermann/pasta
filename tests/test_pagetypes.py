@@ -49,6 +49,8 @@ from src.pagetypes import (
     _array,
     _blocks,
     _list,
+    _object,
+    _prose,
     _text,
     blocks_cmds,
     collect_ref_ids,
@@ -676,8 +678,9 @@ def _arg_names(command):
 def test_list_cmds_adds_an_optional_blocks_arg_per_declared_field():
     steps = _list("items", element_fields=("text", "detail"),
                   element_blocks=(ElementBlocksSpec("detail", ("paragraph", "code")),))
-    add, _remove, _reorder = list_cmds(
-        "steps", label="step", add_args=(_text(),), field_spec=steps)
+    add, _remove, _reorder = _resolved(
+        "steps", "Steps", steps,
+        list_cmds("steps", label="step", add_args=(_text(),), element_blocks=("detail",)))
     assert _arg_names(add) == ("text", "detail", "index", "precedingId")
     detail = add.args[1]
     assert detail.required is False and detail.type == "array"
@@ -687,11 +690,25 @@ def test_list_cmds_adds_an_optional_blocks_arg_per_declared_field():
     assert "detail" not in dict(add.element_map)
 
 
+def _resolved(section_key, title, field_spec, commands):
+    """`commands` as the page type owning `field_spec` resolves them.
+
+    A factory hands back block arguments with no vocabulary; the page type fills them in, so
+    that is what every consumer sees and what these tests assert against.
+    """
+    return PageType(
+        tag="xtest-resolved-factory", name="Resolved factory", description="ad-hoc",
+        sections=(SectionSpec(section_key, title, (field_spec,)),),
+        commands=commands,
+        fsm=FSMSpec(name="XTestResolvedFactory", initial="active", states=("active",)),
+    ).commands
+
+
 def test_blocks_cmds_is_four_commands_named_from_the_label():
     """One add and one set per blocks field, named by _setter_label - the section for a `body`
     field, the field key otherwise - beside the remove and reorder they already had."""
     body = _blocks("body")
-    add, set_cmd, remove, reorder = blocks_cmds("body", body)
+    add, set_cmd, remove, reorder = _resolved("body", "Body", body, blocks_cmds("body"))
     assert (add.name, set_cmd.name, remove.name, reorder.name) == (
         "addBody", "setBodyBlock", "removeBlock", "reorderBlock")
     assert _arg_names(add) == ("blocks", "index", "precedingId")
@@ -710,16 +727,17 @@ def test_blocks_cmds_is_four_commands_named_from_the_label():
 
 def test_blocks_cmds_label_and_name_overrides():
     models = _blocks("models", block_kinds=("code",))
-    add, set_cmd, remove, reorder = blocks_cmds(
-        "dataModels", models, label="dataModels",
-        remove_name="removeDataModel", reorder_name="reorderDataModel")
+    add, set_cmd, remove, reorder = _resolved(
+        "dataModels", "Data models", models,
+        blocks_cmds("dataModels", field="models", label="dataModels",
+                    remove_name="removeDataModel", reorder_name="reorderDataModel"))
     assert (add.name, set_cmd.name, remove.name, reorder.name) == (
         "addDataModels", "setDataModelsBlock", "removeDataModel", "reorderDataModel")
     # A restricted field offers exactly what it declares, at both the add and the set.
     assert [kind.kind for kind in add.args[0].block_kinds or ()] == ["code"]
     assert [kind.kind for kind in set_cmd.args[1].block_kinds or ()] == ["code"]
     named, _set, _remove, _reorder = blocks_cmds(
-        "body", _blocks("body"), add_name="addProse", set_name="setProseBlock")
+        "body", add_name="addProse", set_name="setProseBlock")
     assert named.name == "addProse"
 
 
@@ -727,9 +745,10 @@ def test_element_blocks_cmds_leads_with_the_element_id():
     """The element noun leads and the declared field key follows, with no pluralizing."""
     steps = _list("items", element_fields=("detail", "status"),
                   element_blocks=(ElementBlocksSpec("detail", ("paragraph", "code")),))
-    add, set_cmd, remove, reorder = element_blocks_cmds("steps", steps, "detail")
+    add, set_cmd, remove, reorder = _resolved(
+        "steps", "Steps", steps, element_blocks_cmds("steps", "detail"))
     assert (add.name, set_cmd.name, remove.name, reorder.name) == (
-        "addStepDetail", "setStepDetailBlock", "removeDetailBlock", "reorderDetailBlock")
+        "addStepDetail", "setStepDetailBlock", "removeStepDetail", "reorderStepDetail")
     assert _arg_names(add) == ("stepId", "blocks", "index", "precedingId")
     assert _arg_names(set_cmd) == ("stepId", "blockId", "block")
     assert _arg_names(remove) == ("stepId", "blockId")
@@ -739,13 +758,6 @@ def test_element_blocks_cmds_leads_with_the_element_id():
         assert command.element_field == "detail"
         assert command.section == "steps" and command.field == "items"
     assert [kind.kind for kind in add.args[1].block_kinds or ()] == ["paragraph", "code"]
-
-
-def test_element_blocks_cmds_rejects_an_undeclared_element_field():
-    steps = _list("items", element_fields=("detail", "status"),
-                  element_blocks=(ElementBlocksSpec("detail", ("code",)),))
-    with pytest.raises(ValueError, match="not declared as a block-bearing element field"):
-        element_blocks_cmds("steps", steps, "status")
 
 
 def test_validate_block_and_validate_blocks_are_one_grammar():
@@ -833,10 +845,93 @@ def test_two_do_eligible_setters_for_one_field_are_rejected():
         PageType(
             tag="xtest-two-setters", name="Two setters", description="ad-hoc",
             sections=(SectionSpec("body", "Body", (body,)),),
-            commands=(set_prose_cmd("body"), *blocks_cmds("body", body)),
+            commands=(set_prose_cmd("body"), *blocks_cmds("body")),
             fsm=FSMSpec(name="XTestTwoSetters", initial="active", states=("active",)),
         )
     # Every registered type passes it - the five collapsing blocks fields were the only ones
     # that ever carried more than one.
     for page_type in {**REGISTRY, **TEST_REGISTRY}.values():
         page_type._validate_single_field_setter()
+
+
+def test_a_block_argument_is_resolved_from_its_field():
+    """A command factory names the section and field it builds for; the page type is the first
+    thing holding both, so it is what turns that into a vocabulary."""
+    body = _blocks("body", block_kinds=("code", "paragraph"))
+    page_type = PageType(
+        tag="xtest-resolved", name="Resolved", description="ad-hoc",
+        sections=(SectionSpec("body", "Body", (body,)),),
+        commands=(
+            CommandSpec("addBody", ADD_BLOCK, "add blocks to the body",
+                        section="body", field="body",
+                        args=(_array("blocks", content=BLOCK_ARRAY),)),
+            CommandSpec("setBodyBlock", SET_BLOCK, "replace one block in the body",
+                        section="body", field="body",
+                        args=(_text("blockId"), _object("block", content=BLOCK))),
+        ),
+        fsm=FSMSpec(name="XTestResolved", initial="active", states=("active",)))
+    add, set_cmd = page_type.commands
+    assert add.args[0].block_kinds == body.block_vocabulary()
+    assert set_cmd.args[1].block_kinds == body.block_vocabulary()
+    assert [kind.kind for kind in add.args[0].block_kinds or ()] == ["code", "paragraph"]
+    # An argument that carries no blocks is returned untouched.
+    assert set_cmd.args[0].block_kinds is None
+
+
+def _targeted_vocabulary(page_type, command, arg):
+    """The vocabulary `arg` should carry, worked out from the sections independently of the
+    resolution step - so the two can be compared rather than one trusting the other."""
+    field_spec = page_type.field_spec(command.section, command.field)
+    assert field_spec is not None
+    element_field = command.element_field or (
+        arg.name if command.kind == ADD_ELEMENT else None)
+    if element_field is None:
+        return field_spec.block_vocabulary()
+    spec = field_spec.element_blocks_spec(element_field)
+    assert spec is not None
+    return spec.vocabulary()
+
+
+def test_resolution_reproduces_the_declared_vocabularies():
+    """Every block-carrying argument in the whole registry carries exactly the vocabulary of the
+    field it targets. Run while the factories still supply the kinds, this says the resolver reads
+    the right field; run after they stop, it says the resolver is the only supplier."""
+    checked = 0
+    for page_type in ALL_TYPES.values():
+        for command in page_type.commands:
+            for arg in command.args:
+                if arg.content not in (BLOCK, BLOCK_ARRAY):
+                    continue
+                assert arg.block_kinds == _targeted_vocabulary(page_type, command, arg), (
+                    f"{page_type.tag}.{command.name} argument '{arg.name}'")
+                checked += 1
+    assert checked >= 16      # 7 page-level fields x2, plus the element-scoped surface
+
+
+def test_a_block_argument_that_cannot_be_resolved_is_rejected_at_import():
+    """The only place a bad block declaration can be caught.
+
+    Every consumer reads block_kinds as "not a block argument" when it is None, so an
+    unresolved argument would accept any block, describe itself as an untyped array and lose
+    its cross-page ref check - silently, with nothing raising.
+    """
+    def page_type(section_spec, command):
+        return PageType(
+            tag="xtest-unresolvable", name="Unresolvable", description="ad-hoc",
+            sections=(section_spec,), commands=(command,),
+            fsm=FSMSpec(name="XTestUnresolvable", initial="active", states=("active",)))
+
+    add = CommandSpec("addBody", ADD_BLOCK, "add blocks to the body",
+                      section="body", field="body",
+                      args=(_array("blocks", content=BLOCK_ARRAY),))
+    with pytest.raises(ValueError, match="not a declared field"):
+        page_type(SectionSpec("body", "Body", (_blocks("other"),)), add)
+    with pytest.raises(ValueError, match="not a blocks field"):
+        page_type(SectionSpec("body", "Body", (_prose("body"),)), add)
+
+    items = _list("items", element_fields=("text", "detail"))
+    element_add = CommandSpec("addItemDetail", ADD_BLOCK, "add blocks to an item's detail",
+                              section="items", field="items", element_field="detail",
+                              args=(_text("itemId"), _array("blocks", content=BLOCK_ARRAY)))
+    with pytest.raises(ValueError, match="block-bearing element field"):
+        page_type(SectionSpec("items", "Items", (items,)), element_add)

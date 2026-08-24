@@ -172,17 +172,16 @@ TEST_FIELDS = PageType(
 # insert. The field declares no vocabulary, so it accepts every standard kind. Single terminal
 # `active` state (also the single-state / terminal case for render and reachable_states).
 # ============================================================================
-_BLOCKS_BODY = _blocks("body", "a rich-text blocks body")
 TEST_BLOCKS = PageType(
     tag="test-blocks",
     name="Blocks fixture",
     description="Test fixture: the blocks field - every block kind and the inline-run grammar.",
     sections=(
-        SectionSpec("body", "Body", (_BLOCKS_BODY,)),
+        SectionSpec("body", "Body", (_blocks("body", "a rich-text blocks body"),)),
     ),
     # The field is passed to both its section and its factory, so its vocabulary - here the
     # default, every standard kind - is declared once.
-    commands=(*blocks_cmds("body", _BLOCKS_BODY), add_link_cmd(), set_title_cmd()),
+    commands=(*blocks_cmds("body"), add_link_cmd(), set_title_cmd()),
     fsm=FSMSpec(name="TestBlocks", initial="active", states=("active",)),
 )
 
@@ -195,28 +194,29 @@ TEST_BLOCKS = PageType(
 # the only way to observe both the draft-only content lock on the element-scoped commands and their
 # absence from the self-direction `do` list.
 # ============================================================================
-_ELEMENT_ITEMS = _list("items", element_fields=("text", "snippet", "detail", "status"),
-                       element_fsm=_STEP_FSM,
-                       element_blocks=(ElementBlocksSpec("snippet", ("code",)),
-                                       ElementBlocksSpec("detail", ("paragraph", "code", "list"))),
-                       description="a list whose elements carry a code-only field and a rich one")
 TEST_ELEMENT_BLOCKS = PageType(
     tag="test-element-blocks",
     name="Element blocks fixture",
     description="Test fixture: list elements whose fields hold blocks, restricted per field.",
     sections=(
-        SectionSpec("items", "Items", (_ELEMENT_ITEMS,)),
+        SectionSpec("items", "Items", (
+            _list("items", element_fields=("text", "snippet", "detail", "status"),
+                  element_fsm=_STEP_FSM,
+                  element_blocks=(ElementBlocksSpec("snippet", ("code",)),
+                                  ElementBlocksSpec("detail", ("paragraph", "code", "list"))),
+                  description="a list whose elements carry a code-only field and a rich one"),
+        )),
     ),
     commands=(
         # Structural edits are draft-only; the element-status marks stay legal once ready.
         # The add carries the element's content, so one command creates a complete item.
         *list_cmds("items", legal_in=("draft",), add_args=(_text("text"),),
-                   field_spec=_ELEMENT_ITEMS),
+                   element_blocks=("snippet", "detail")),
         *element_cmds("items", legal_in=("draft", "ready"),
                       marks=(("markItemDone", "markDone", "mark an item done"),
                              ("markItemTodo", "reopen", "reopen an item"))),
-        *element_blocks_cmds("items", _ELEMENT_ITEMS, "snippet", legal_in=("draft",)),
-        *element_blocks_cmds("items", _ELEMENT_ITEMS, "detail", legal_in=("draft",)),
+        *element_blocks_cmds("items", "snippet", legal_in=("draft",)),
+        *element_blocks_cmds("items", "detail", legal_in=("draft",)),
         transition_cmd("markReady", "draft -> ready", requires=(("items", "items"),)),
         transition_cmd("reopen", "ready -> draft"),
         add_link_cmd(),
@@ -371,30 +371,22 @@ _PARENT_IN_PLANNING_OR_LATER = ParentStateGuard(
 # fixture for integrity the command-level check could never give: a block created together with
 # its element hides its questionId inside an array entry, where store._check_ref - which reads one
 # scalar argument - cannot see it.
-_CHILD_STEPS = _list(
-    "items", element_fields=("text", "note", "status"), element_fsm=_STEP_FSM,
-    element_blocks=(ElementBlocksSpec("note", (
-        BlockKindSpec("decision", args=(_text("questionId"), _text()),
-                      ref_check=RefCheck(arg="questionId", scope="parent",
-                                         section="questions", field="items")),
-        "paragraph",
-    )),),
-    description="build steps (element-FSM todo <-> done)")
-
-_CHILD_DECISIONS = _blocks(
-    "body", "decisions, each linked to a parent question",
-    block_kinds=(
-        BlockKindSpec("decision", args=(_text("questionId"), _text()),
-                      ref_check=RefCheck(arg="questionId", scope="parent",
-                                         section="questions", field="items")),
-        BlockKindSpec("paragraph", args=(_text(),)),
-    ))
 TEST_CHILD = PageType(
     tag="test-child",
     name="Child fixture",
     description="Test fixture: element FSMs + checkbox rendering, a legal_in content lock, and a cross-page ref check.",
     sections=(
-        SectionSpec("steps", "Steps", (_CHILD_STEPS,)),
+        SectionSpec("steps", "Steps", (
+            _list("items", element_fields=("text", "note", "status"),
+                  element_fsm=_STEP_FSM,
+                  element_blocks=(ElementBlocksSpec("note", (
+                      BlockKindSpec("decision", args=(_text("questionId"), _text()),
+                                    ref_check=RefCheck(arg="questionId", scope="parent",
+                                                       section="questions", field="items")),
+                      "paragraph",
+                  )),),
+                  description="build steps (element-FSM todo <-> done)"),
+        )),
         SectionSpec("checks", "Checks", (
             _list("items", element_fields=("text", "status"), element_fsm=_CHECK_FSM,
                   description="verification checks (element-FSM pending -> passed/failed)"),
@@ -403,12 +395,20 @@ TEST_CHILD = PageType(
             _list("items", element_fields=("questionId", "text"),
                   description="notes, each linked to a parent question (a ref-checked list add)"),
         )),
-        SectionSpec("decisions", "Decisions", (_CHILD_DECISIONS,)),
+        SectionSpec("decisions", "Decisions", (
+            _blocks("body", "decisions, each linked to a parent question",
+                    block_kinds=(
+                        BlockKindSpec("decision", args=(_text("questionId"), _text()),
+                                      ref_check=RefCheck(arg="questionId", scope="parent",
+                                                         section="questions", field="items")),
+                        BlockKindSpec("paragraph", args=(_text(),)),
+                    )),
+        )),
     ),
     commands=(
         *list_cmds("steps", label="step", add_args=(_text(),), legal_in=("draft",),
-                   field_spec=_CHILD_STEPS),
-        *element_blocks_cmds("steps", _CHILD_STEPS, "note", legal_in=("draft",)),
+                   element_blocks=("note",)),
+        *element_blocks_cmds("steps", "note", legal_in=("draft",)),
         # Element-status marks stay legal in `ready` (progress recorded on a finalized plan); only
         # the structural add/remove/reorder commands are `draft`-only.
         *element_cmds("steps", legal_in=("draft", "ready"), marks=(
@@ -422,7 +422,7 @@ TEST_CHILD = PageType(
         *list_cmds("notes", label="note", add_args=(_text("questionId"), _text()),
                    ref_check=RefCheck(arg="questionId", scope="parent", section="questions", field="items"),
                    legal_in=("draft",)),
-        *blocks_cmds("decisions", _CHILD_DECISIONS,
+        *blocks_cmds("decisions",
                      remove_name="removeDecision", remove_desc="remove a decision",
                      reorder_name="reorderDecision",
                      reorder_desc="move a decision to an anchored position "

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from collections.abc import Generator
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from textwrap import dedent
 from typing import Any, cast
 
@@ -416,9 +416,57 @@ class PageType:
     auto_children: tuple[AutoChildSpec, ...] = ()
 
     def __post_init__(self):
+        self._resolve_block_vocabularies()
         object.__setattr__(self.fsm, "transitions", status_transitions(self))
         self._validate_field_setter_descriptions()
         self._validate_single_field_setter()
+
+    def _resolve_block_vocabularies(self) -> None:
+        """Fill each block-carrying argument's accepted kinds in from the field it targets.
+
+        A command factory names the section and field it builds for; this is the first point
+        that can turn that into a vocabulary, because it is the first point holding both.
+        """
+        object.__setattr__(self, "commands", tuple(
+            replace(command,
+                    args=tuple(self._resolved_arg(command, arg) for arg in command.args))
+            for command in self.commands))
+
+    def _resolved_arg(self, command: CommandSpec, arg: ArgSpec) -> ArgSpec:
+        """`arg` with its vocabulary filled in, or unchanged when it carries no blocks.
+
+        Raises rather than leaving one unresolved: every consumer reads block_kinds as
+        "not a block argument" when it is None, so an unresolved argument would accept any
+        block, describe itself as an untyped array, and lose its cross-page ref check, with
+        nothing raising anywhere.
+        """
+        if arg.content not in (BLOCK, BLOCK_ARRAY):
+            return arg
+        if command.section is None or command.field is None:
+            raise ValueError(
+                f"{self.tag}: command '{command.name}' carries blocks but targets no field.")
+        field_spec = self.field_spec(command.section, command.field)
+        if field_spec is None:
+            raise ValueError(
+                f"{self.tag}: command '{command.name}' carries blocks for "
+                f"{command.section}.{command.field}, which is not a declared field.")
+        # A list add carries one block argument per block-bearing element field, named after
+        # it; an element-scoped block command names that field on the command instead.
+        element_field = command.element_field or (
+            arg.name if command.kind == ADD_ELEMENT else None)
+        if element_field is None:
+            if field_spec.kind != BLOCKS:
+                raise ValueError(
+                    f"{self.tag}: command '{command.name}' carries blocks for "
+                    f"{command.section}.{command.field}, which is not a blocks field.")
+            return replace(arg, block_kinds=field_spec.block_vocabulary())
+        spec = field_spec.element_blocks_spec(element_field)
+        if spec is None:
+            raise ValueError(
+                f"{self.tag}: command '{command.name}' carries blocks for "
+                f"{command.section}.{command.field}.{element_field}, which is not declared "
+                f"as a block-bearing element field.")
+        return replace(arg, block_kinds=spec.vocabulary())
 
     def _validate_single_field_setter(self) -> None:
         """Reject a type declaring two do-eligible setters for one (section, field).
@@ -665,7 +713,7 @@ def set_scalar_cmd(section: str, field: str, *, name: str | None = None,
 
 def list_cmds(section: str, *, field: str = "items", singular: str | None = None,
               label: str | None = None, add_args: tuple[ArgSpec, ...] | None = None,
-              field_spec: FieldSpec | None = None,
+              element_blocks: tuple[str, ...] = (),
               legal_in: tuple[str, ...] | None = None, ref_check: RefCheck | None = None,
               add: bool = True, remove: bool = True, reorder: bool = True,
               add_name: str | None = None, remove_name: str | None = None,
@@ -681,20 +729,20 @@ def list_cmds(section: str, *, field: str = "items", singular: str | None = None
     another page carries a `ref_check`; the remove and reorder name an element already on this
     page, so they do not.
 
-    `field_spec` is the list field's own declaration. Every block-bearing element field it
-    declares gives the add one optional array arg named after that element field, carrying the
-    blocks the element is created holding - so creating an element and giving it content is one
-    command, and a batch never has to name an id it has not committed. Those args stay out of
-    element_map, because the raw argument is never written onto the element; the add converts it
-    into id'd blocks. Taking the FieldSpec rather than a restated tuple is what keeps a field's
-    block vocabulary declared exactly once - the declaration and the commands read the same
-    object, so they cannot drift."""
+    `element_blocks` names the element fields whose blocks the add can carry. Each gives the
+    add one optional array arg named after that element field, holding the blocks the element is
+    created with - so creating an element and giving it content is one command, and a batch never
+    has to name an id it has not committed. Those args stay out of element_map, because the raw
+    argument is never written onto the element; the add converts it into id'd blocks. Only the
+    names are given here, because they decide the add's argument list; the kinds each one accepts
+    are resolved by PageType from the field's own declaration, and a name the field does not
+    declare as block-bearing is rejected there."""
     noun = singular or _singular(field if field != "items" else section)
     cap, id_arg, label = _cap(noun), f"{noun}Id", label or noun
     block_args = tuple(
-        _array(spec.field, content=BLOCK_ARRAY, required=False, block_kinds=spec.vocabulary(),
-               description=f"the {spec.field} blocks to create the {noun} with")
-        for spec in (field_spec.element_blocks if field_spec is not None else ()))
+        _array(name, content=BLOCK_ARRAY, required=False,
+               description=f"the {name} blocks to create the {noun} with")
+        for name in element_blocks)
     out: list[CommandSpec] = []
     if add:
         out.append(CommandSpec(add_name or f"add{cap}", ADD_ELEMENT, f"add {_a(label)} {label}",
@@ -781,16 +829,16 @@ def is_field_setter(command: CommandSpec) -> bool:
     return command.kind in (SET_SCALAR, SET_PROSE, ADD_ELEMENT)
 
 
-def blocks_cmds(section: str, field_spec: FieldSpec, *, label: str | None = None,
+def blocks_cmds(section: str, *, field: str = "body", label: str | None = None,
                 add_name: str | None = None, set_name: str | None = None,
                 remove_name: str = "removeBlock", remove_desc: str = "remove a block",
                 reorder_name: str = "reorderBlock", reorder_desc: str | None = None,
                 legal_in: tuple[str, ...] | None = None) -> tuple[CommandSpec, ...]:
     """A blocks field's whole authoring surface: add, set, remove, reorder - four commands.
 
-    The vocabulary is read off `field_spec`, so the field declares it once and the commands and
-    the validator cannot disagree. A block's kind travels as data inside the argument, which is
-    what replaces one add (and one set) per kind.
+    The field declares its vocabulary once and PageType resolves it onto these arguments, so the
+    commands and the validator read one declaration. A block's kind travels as data inside the
+    argument, which is what replaces one add (and one set) per kind.
 
         add -> add<Label>(blocks, index?, precedingId?)      ADD_BLOCK
         set -> set<Label>Block(blockId, block)               SET_BLOCK
@@ -801,8 +849,6 @@ def blocks_cmds(section: str, field_spec: FieldSpec, *, label: str | None = None
     shapes they have always had. A type with more than one blocks field passes distinct
     remove_name / reorder_name so command names stay unique.
     """
-    field = field_spec.key
-    kinds = field_spec.block_vocabulary()
     noun = _setter_label(section, field, label)
     cap = _cap(noun)
     reorder_desc = reorder_desc or (
@@ -810,7 +856,7 @@ def blocks_cmds(section: str, field_spec: FieldSpec, *, label: str | None = None
     add = CommandSpec(
         add_name or f"add{cap}", ADD_BLOCK, f"add blocks to the {noun}",
         section=section, field=field,
-        args=(_array("blocks", content=BLOCK_ARRAY, block_kinds=kinds,
+        args=(_array("blocks", content=BLOCK_ARRAY,
                      description="the blocks to add, each naming its own kind"),
               _INDEX, _PRECEDING),
         legal_in=legal_in)
@@ -818,7 +864,7 @@ def blocks_cmds(section: str, field_spec: FieldSpec, *, label: str | None = None
         set_name or f"set{cap}Block", SET_BLOCK, f"replace one block in the {noun}",
         section=section, field=field,
         args=(_text("blockId"),
-              _object("block", content=BLOCK, block_kinds=kinds,
+              _object("block", content=BLOCK,
                       description="the replacement block, naming its own kind")),
         legal_in=legal_in)
     remove = CommandSpec(remove_name, REMOVE_BLOCK, remove_desc, section=section, field=field,
@@ -829,7 +875,7 @@ def blocks_cmds(section: str, field_spec: FieldSpec, *, label: str | None = None
     return (add, set_cmd, remove, reorder)
 
 
-def element_blocks_cmds(section: str, field_spec: FieldSpec, element_field: str, *,
+def element_blocks_cmds(section: str, element_field: str, *, field: str = "items",
                         singular: str | None = None,
                         legal_in: tuple[str, ...] | None = None) -> tuple[CommandSpec, ...]:
     """The same four commands for one block-bearing element field, each led by the element id.
@@ -848,12 +894,6 @@ def element_blocks_cmds(section: str, field_spec: FieldSpec, element_field: str,
     for appending to an element that already exists, which is what keeps a step's detail from
     becoming write-once at creation.
     """
-    field = field_spec.key
-    spec = field_spec.element_blocks_spec(element_field)
-    if spec is None:
-        raise ValueError(
-            f"{field}.{element_field} is not declared as a block-bearing element field.")
-    kinds = spec.vocabulary()
     noun = singular or _singular(field if field != "items" else section)
     id_arg, cap, fcap = f"{noun}Id", _cap(noun), _cap(element_field)
     return (
@@ -861,7 +901,7 @@ def element_blocks_cmds(section: str, field_spec: FieldSpec, element_field: str,
                     f"add blocks to {_a(noun)} {noun}'s {element_field}",
                     section=section, field=field, element_field=element_field,
                     args=(_text(id_arg),
-                          _array("blocks", content=BLOCK_ARRAY, block_kinds=kinds,
+                          _array("blocks", content=BLOCK_ARRAY,
                                  description="the blocks to add, each naming its own kind"),
                           _INDEX, _PRECEDING),
                     legal_in=legal_in),
@@ -869,7 +909,7 @@ def element_blocks_cmds(section: str, field_spec: FieldSpec, element_field: str,
                     f"replace one block in {_a(noun)} {noun}'s {element_field}",
                     section=section, field=field, element_field=element_field,
                     args=(_text(id_arg), _text("blockId"),
-                          _object("block", content=BLOCK, block_kinds=kinds,
+                          _object("block", content=BLOCK,
                                   description="the replacement block, naming its own kind")),
                     legal_in=legal_in),
         CommandSpec(f"remove{cap}{fcap}", REMOVE_BLOCK,
