@@ -62,6 +62,7 @@ from src.pagetypes import (
     validate_block,
     validate_blocks,
     validate_inline_content,
+    validate_pagetype_field_setters,
     validate_table,
     FSMSpec,
 )
@@ -851,7 +852,7 @@ def test_two_do_eligible_setters_for_one_field_are_rejected():
     # Every registered type passes it - the five collapsing blocks fields were the only ones
     # that ever carried more than one.
     for page_type in {**REGISTRY, **TEST_REGISTRY}.values():
-        page_type._validate_single_field_setter()
+        validate_pagetype_field_setters(page_type)
 
 
 def test_a_block_argument_is_resolved_from_its_field():

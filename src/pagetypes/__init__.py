@@ -84,7 +84,6 @@ from .core.fields import (
     _scalar,
 )
 from .core.commands import (
-    PageType,
     _a,
     _cap,
     _setter_label,
@@ -92,15 +91,18 @@ from .core.commands import (
     blocks_cmds,
     element_blocks_cmds,
     element_cmds,
-    initial_sections,
     is_field_setter,
     list_cmds,
     set_element_field_cmd,
     set_prose_cmd,
     set_scalar_cmd,
-    status_transitions,
     transition_cmd,
     transition_on_add_cmd,
+)
+from .core.pagetype import (
+    PageType,
+    initial_sections,
+    status_transitions,
 )
 from .core.validation import (
     _block_ref_ids,
@@ -111,6 +113,8 @@ from .core.validation import (
     validate_block,
     validate_blocks,
     validate_inline_content,
+    validate_pagetype_field_setters,
+    validate_pagetype_setter_descriptions,
     validate_table,
 )
 
@@ -202,6 +206,8 @@ __all__ = [
     "validate_block",
     "validate_blocks",
     "validate_inline_content",
+    "validate_pagetype_field_setters",
+    "validate_pagetype_setter_descriptions",
     "validate_table",
 ]
 
