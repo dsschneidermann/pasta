@@ -206,7 +206,7 @@ __all__ = [
 ]
 
 # --- The page types ----------------------------------------------------------
-# These imports MUST stay below every re-export above: each page-type module reaches
+# These imports stay below every re-export above: each page-type module reaches
 # its helpers back through this package, so the names have to be bound before these
 # imports run. A re-export moved below this block raises ImportError on the first
 # import of src.pagetypes.
