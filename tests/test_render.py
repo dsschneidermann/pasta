@@ -87,6 +87,27 @@ def test_render_workspace_links_show_meta_false():
     assert "`" not in md and "·" not in md                      # but no type/status meta
 
 
+def test_render_workspace_links_status_suffix_for_change_types_only():
+    # feature-brief/simple-change/bug-report carry their status in parens inside the link text;
+    # other page types (e.g. architecture) render a plain title with no status suffix.
+    tree = {"workspaceId": "ws:demo", "nodes": [
+        {"id": "feature-brief:a1", "title": "Feature", "type": "feature-brief", "status": "shipped",
+         "children": []},
+        {"id": "simple-change:b1", "title": "Change", "type": "simple-change", "status": "done",
+         "children": []},
+        {"id": "bug-report:c1", "title": "Bug", "type": "bug-report", "status": "open",
+         "children": []},
+        {"id": "architecture:d1", "title": "Arch", "type": "architecture", "status": "current",
+         "children": []},
+    ]}
+    md = render_workspace_links(tree, show_archived=False, show_meta=False)
+    assert "[Feature (shipped)](/ws:demo/page/feature-brief:a1)" in md
+    assert "[Change (done)](/ws:demo/page/simple-change:b1)" in md
+    assert "[Bug (open)](/ws:demo/page/bug-report:c1)" in md
+    assert "[Arch](/ws:demo/page/architecture:d1)" in md
+    assert "[Arch (current)]" not in md
+
+
 def test_render_workspace_links_archived_marker_is_prefix():
     # An archived node is flagged with a bold (A) marker BEFORE its link, not a trailing suffix.
     tree = {"workspaceId": "ws:demo", "nodes": [

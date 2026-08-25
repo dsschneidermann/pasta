@@ -375,6 +375,11 @@ def render_tree(workspace: Workspace, show_archived: bool = False) -> str:
     return "\n".join(out).rstrip() + "\n"
 
 
+# Page types whose workspace status is worth a glance in the nav tree - the pages a user
+# tracks through a lifecycle, as opposed to structural/reference pages (toc, architecture, ...).
+_STATUS_SUFFIX_TYPES = frozenset({"feature-brief", "simple-change", "bug-report"})
+
+
 def render_workspace_links(tree: dict[str, Any], show_archived: bool = False, show_meta: bool = False,
                            escape_plain_text: bool = False) -> str:
     """A `store.tree()` result as a nested Markdown list - every page a link to /page/<id>.
@@ -385,6 +390,8 @@ def render_workspace_links(tree: dict[str, Any], show_archived: bool = False, sh
     `show_archived=True` lists links with `?archived=true` query parameter.
     `show_meta=True` lists the page-title links, including each page's `type · status`.
     `escape_plain_text=True` (the web path) markdown-escapes the plain-text page-title labels.
+    When `show_meta=False`, pages of a type in `_STATUS_SUFFIX_TYPES` get their status appended
+    to the link text in parentheses, e.g. "Change (done)".
     """
     query = "?archived=true" if show_archived else ""
 
@@ -394,6 +401,8 @@ def render_workspace_links(tree: dict[str, Any], show_archived: bool = False, sh
             indent = "  " * depth
             title = escape_markdown(page['title']) if escape_plain_text else page['title']
             meta = f" *{page['type']}* · `{page['status']}`" if show_meta else ""
+            if not show_meta and page['type'] in _STATUS_SUFFIX_TYPES:
+                title = f"{title} ({page['status']})"
             prefix = "**(A)** " if page.get("archived") else ""
             lines.append(f"{indent}- {prefix}[{title}](/{str(tree.get("workspaceId"))}/page/{page['id']}{query}){meta}")
             lines.extend(walk(page.get("children", []), depth + 1))
