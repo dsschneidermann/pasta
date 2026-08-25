@@ -176,20 +176,14 @@ def test_render_blocks_block_kinds():
     assert any(line == "---" for line in md.splitlines())  # divider on its own line
 
 
-def test_blocks_block_editing_in_place_and_move():
+def test_blocks_block_move_and_remove():
     factory = make_counter()
     p = apply_command(new_blocks(factory), BLOCKS, "addBody", {"blocks": [{"kind": "paragraph", "inlines": ["first"]}]}, factory)
     first_id = p.created_id
     h = apply_command(p.page, BLOCKS, "addBody", {"blocks": [{"kind": "heading", "level": 1, "inlines": ["Title"]}]}, factory)
     heading_id = h.created_id
-    # setParagraph edits in place: same block id, runs replaced, no new id created
-    edited = apply_command(h.page, BLOCKS, "setBodyBlock",
-                           {"blockId": first_id, "block": {"kind": "paragraph", "inlines": ["updated"]}}, factory)
-    body = edited.page.sections["body"]["body"]
-    assert body[0]["id"] == first_id and body[0]["inlines"] == ["updated"]
-    assert edited.created_id is None
     # reorderBlock moves by id - front insert names no predecessor
-    moved = apply_command(edited.page, BLOCKS, "reorderBlock",
+    moved = apply_command(h.page, BLOCKS, "reorderBlock",
                           {"blockId": heading_id, "toIndex": 0, "precedingId": None}, factory)
     assert [b["id"] for b in moved.page.sections["body"]["body"]] == [heading_id, first_id]
     # a stale predecessor for the destination slot is rejected
@@ -210,25 +204,22 @@ def test_blocks_add_block_index_insertion():
     assert [blk["inlines"] for blk in c.page.sections["body"]["body"]] == [["A"], ["C"], ["B"]]
 
 
-def test_blocks_set_may_change_a_block_kind():
-    """A generalized set overwrites the block whatever its kind, keeping its id and its slot.
-
-    The per-kind guard this replaces ('setParagraph edits a paragraph block, but block X is a
-    heading') existed only because the command carried its kind; a set that could not change the
-    kind would leave an in-place retype expressible only as remove + positioned add, creating a
-    new id.
-    """
+def test_a_block_is_retyped_by_removing_it_and_adding_at_its_slot():
+    """There is no in-place edit, so changing a paragraph into a heading is remove plus a
+    positioned add. The block keeps its slot and renders as the new kind; the id is new."""
     factory = make_counter()
     p = apply_command(new_blocks(factory), BLOCKS, "addBody",
                       {"blocks": [{"kind": "paragraph", "inlines": ["x"]}]}, factory)
-    edited = apply_command(p.page, BLOCKS, "setBodyBlock",
-                           {"blockId": p.created_id,
-                            "block": {"kind": "heading", "level": 1, "inlines": ["y"]}}, factory)
-    assert edited.page.sections["body"]["body"] == [
-        {"id": p.created_id, "kind": "heading", "level": 1, "inlines": ["y"]}
+    removed = apply_command(p.page, BLOCKS, "removeBlock", {"blockId": p.created_id}, factory)
+    retyped = apply_command(removed.page, BLOCKS, "addBody",
+                            {"blocks": [{"kind": "heading", "level": 1, "inlines": ["y"]}]},
+                            factory)
+    assert retyped.page.sections["body"]["body"] == [
+        {"id": retyped.created_id, "kind": "heading", "level": 1, "inlines": ["y"]}
     ]
-    assert "## y" not in render_page(edited.page, BLOCKS)   # level 1, so a single hash
-    assert "# y" in render_page(edited.page, BLOCKS)
+    assert retyped.created_id != p.created_id
+    assert "## y" not in render_page(retyped.page, BLOCKS)   # level 1, so a single hash
+    assert "# y" in render_page(retyped.page, BLOCKS)
 
 
 def test_blocks_reject_markdown_and_bad_table_at_apply_time():

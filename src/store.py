@@ -33,7 +33,6 @@ from .ids import IdFactory, default_id_factory, new_id
 from .model import Page, Workspace
 from .pagetypes import (
     ADD_LINK,
-    BLOCK,
     BLOCK_ARRAY,
     COMPOUND,
     LIST,
@@ -869,17 +868,14 @@ class Store:
         """Enforce every cross-page ref carried inside a block argument.
 
         A block kind declares its own ref_check, because the referencing argument lives in the
-        block rather than flat on the command. Covers the array add and the single-block set, and
-        - through a list add's block arguments - blocks created together with their element, which
-        the command-level check could never see: it reads one scalar arg and cannot reach into an
-        array entry.
+        block rather than flat on the command. Covers the array add and - through a list add's
+        block arguments - blocks created together with their element, which the command-level
+        check could never see: it reads one scalar arg and cannot reach into an array entry.
         """
         for arg in command.args:
-            if arg.content not in (BLOCK, BLOCK_ARRAY) or arg.block_kinds is None:
+            if arg.content != BLOCK_ARRAY or arg.block_kinds is None:
                 continue
-            value = args.get(arg.name)
-            entries = value if arg.content == BLOCK_ARRAY else [value]
-            for entry in entries or []:
+            for entry in args.get(arg.name) or []:
                 if not isinstance(entry, dict):
                     continue                  # left for the grammar validation to reject
                 spec = next((kind for kind in arg.block_kinds

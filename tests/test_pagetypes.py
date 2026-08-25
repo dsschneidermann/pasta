@@ -26,7 +26,6 @@ from src.pagetypes import (
     REORDER_ELEMENT,
     REMOVE_BLOCK,
     REMOVE_ELEMENT,
-    SET_BLOCK,
     SET_ELEMENT_FIELD,
     SET_PROSE,
     SET_SCALAR,
@@ -35,7 +34,6 @@ from src.pagetypes import (
     TRANSITION,
     BLOCKS,
     BLOCK_ARGS,
-    BLOCK,
     BLOCK_ARRAY,
     LIST,
     PROSE,
@@ -51,7 +49,6 @@ from src.pagetypes import (
     _array,
     _blocks,
     _list,
-    _object,
     _prose,
     _text,
     blocks_cmds,
@@ -82,11 +79,11 @@ ALL_TYPES = {**REGISTRY, **TEST_REGISTRY}
 # Commands that target a real section.field
 CONTENT_TARGETING = {
     SET_SCALAR, SET_PROSE, ADD_ELEMENT, SET_ELEMENT_FIELD, ELEMENT_TRANSITION,
-    REORDER_ELEMENT, REORDER_BLOCK, REMOVE_ELEMENT, ADD_BLOCK, SET_BLOCK, REMOVE_BLOCK,
+    REORDER_ELEMENT, REORDER_BLOCK, REMOVE_ELEMENT, ADD_BLOCK, REMOVE_BLOCK,
 }
 # Commands that edit a `blocks` field (must target a BLOCKS field). reorder_block belongs here;
 # reorder_element (its list-field twin) does not - it targets a LIST field.
-BLOCK_TARGETING = {ADD_BLOCK, SET_BLOCK, REMOVE_BLOCK, REORDER_BLOCK}
+BLOCK_TARGETING = {ADD_BLOCK, REMOVE_BLOCK, REORDER_BLOCK}
 # List-element commands whose element_map fields must be declared on the (LIST) field
 ELEMENT_MAPPING = {ADD_ELEMENT, SET_ELEMENT_FIELD, ELEMENT_TRANSITION}
 
@@ -342,11 +339,10 @@ LIFE = get_page_type("test-lifecycle")
 
 
 def test_blocks_fixture_has_full_block_surface():
-    """A blocks field's whole surface is four commands, whatever its vocabulary. The fixture
-    accepts every standard kind and still declares exactly one add and one set."""
+    """A blocks field's whole surface is three commands, whatever its vocabulary. The fixture
+    accepts every standard kind and still declares exactly one add."""
     names = {command.name for command in BLK.commands}
-    assert {"addBody", "setBodyBlock", "reorderBlock", "removeBlock",
-            "addLink", "setTitle"} == names
+    assert {"addBody", "reorderBlock", "removeBlock", "addLink", "setTitle"} == names
 
 
 def test_add_link_on_every_authorable_type_but_not_toc():
@@ -667,9 +663,6 @@ def test_collect_ref_ids_finds_a_ref_inside_a_block():
         {"kind": "paragraph", "inlines": ["see ", {"ref": "a:1"}]},
         {"kind": "code", "language": "py", "source": "x = 1"},
     ], kinds) == ["a:1"]
-    # The single-block form a generalized set carries reaches the same runs.
-    assert collect_ref_ids(
-        BLOCK, {"kind": "paragraph", "inlines": ["see ", {"ref": "a:1"}]}, kinds) == ["a:1"]
     assert collect_ref_ids(BLOCK_ARRAY, "not-a-list", kinds) == []
 
 
@@ -722,40 +715,35 @@ def _resolved(section_key, title, field_spec, commands):
     ).commands
 
 
-def test_blocks_cmds_is_four_commands_named_from_the_label():
-    """One add and one set per blocks field, named by _setter_label - the section for a `body`
-    field, the field key otherwise - beside the remove and reorder they already had."""
+def test_blocks_cmds_is_three_commands_named_from_the_label():
+    """One add per blocks field, named by _setter_label - the section for a `body` field, the
+    field key otherwise - beside the remove and reorder it already had."""
     body = _blocks("body")
-    add, set_cmd, remove, reorder = _resolved("body", "Body", body, blocks_cmds("body"))
-    assert (add.name, set_cmd.name, remove.name, reorder.name) == (
-        "addBody", "setBodyBlock", "removeBlock", "reorderBlock")
+    add, remove, reorder = _resolved("body", "Body", body, blocks_cmds("body"))
+    assert (add.name, remove.name, reorder.name) == ("addBody", "removeBlock", "reorderBlock")
     assert _arg_names(add) == ("blocks", "index", "precedingId")
-    assert _arg_names(set_cmd) == ("blockId", "block")
     assert _arg_names(remove) == ("blockId",)
     assert _arg_names(reorder) == ("blockId", "toIndex", "precedingId")
-    # The add's array and the set's object both carry the field's vocabulary, so the schema and
-    # the validator read the same declaration.
-    assert add.args[0].content == BLOCK_ARRAY and set_cmd.args[1].content == BLOCK
+    # The add's array carries the field's vocabulary, so the schema and the validator read the
+    # same declaration.
+    assert add.args[0].content == BLOCK_ARRAY
     assert add.args[0].block_kinds == body.block_vocabulary()
-    assert set_cmd.args[1].block_kinds == body.block_vocabulary()
-    assert add.args[0].required and set_cmd.args[1].required
-    # Neither writes its raw argument onto anything - the add converts it into id'd blocks.
-    assert dict(add.element_map) == {} and dict(set_cmd.element_map) == {}
+    assert add.args[0].required
+    # It writes no raw argument onto anything - it converts the array into id'd blocks.
+    assert dict(add.element_map) == {}
 
 
 def test_blocks_cmds_label_and_name_overrides():
     models = _blocks("models", block_kinds=("code",))
-    add, set_cmd, remove, reorder = _resolved(
+    add, remove, reorder = _resolved(
         "dataModels", "Data models", models,
         blocks_cmds("dataModels", field="models", label="dataModels",
                     remove_name="removeDataModel", reorder_name="reorderDataModel"))
-    assert (add.name, set_cmd.name, remove.name, reorder.name) == (
-        "addDataModels", "setDataModelsBlock", "removeDataModel", "reorderDataModel")
-    # A restricted field offers exactly what it declares, at both the add and the set.
+    assert (add.name, remove.name, reorder.name) == (
+        "addDataModels", "removeDataModel", "reorderDataModel")
+    # A restricted field offers exactly what it declares.
     assert [kind.kind for kind in add.args[0].block_kinds or ()] == ["code"]
-    assert [kind.kind for kind in set_cmd.args[1].block_kinds or ()] == ["code"]
-    named, _set, _remove, _reorder = blocks_cmds(
-        "body", add_name="addProse", set_name="setProseBlock")
+    named, _remove, _reorder = blocks_cmds("body", add_name="addProse")
     assert named.name == "addProse"
 
 
@@ -763,16 +751,15 @@ def test_element_blocks_cmds_leads_with_the_element_id():
     """The element noun leads and the declared field key follows, with no pluralizing."""
     steps = _list("items", element_fields=("detail", "status"),
                   element_blocks=(ElementBlocksSpec("detail", ("paragraph", "code")),))
-    add, set_cmd, remove, reorder = _resolved(
+    add, remove, reorder = _resolved(
         "steps", "Steps", steps, element_blocks_cmds("steps", "detail"))
-    assert (add.name, set_cmd.name, remove.name, reorder.name) == (
-        "addStepDetail", "setStepDetailBlock", "removeStepDetail", "reorderStepDetail")
+    assert (add.name, remove.name, reorder.name) == (
+        "addStepDetail", "removeStepDetail", "reorderStepDetail")
     assert _arg_names(add) == ("stepId", "blocks", "index", "precedingId")
-    assert _arg_names(set_cmd) == ("stepId", "blockId", "block")
     assert _arg_names(remove) == ("stepId", "blockId")
     assert _arg_names(reorder) == ("stepId", "blockId", "toIndex", "precedingId")
     # element_field is the single seam that routes each command one level deeper.
-    for command in (add, set_cmd, remove, reorder):
+    for command in (add, remove, reorder):
         assert command.element_field == "detail"
         assert command.section == "steps" and command.field == "items"
     assert [kind.kind for kind in add.args[1].block_kinds or ()] == ["paragraph", "code"]
@@ -808,46 +795,35 @@ def test_validate_block_and_validate_blocks_are_one_grammar():
         assert str(one.value) == str(many.value)
 
 
-def test_the_block_surface_is_four_commands_per_field():
-    """The feature's headline outcome, and the only place it is pinned.
+def test_the_block_surface_is_three_commands_per_field():
+    """The headline outcome, and the only place it is pinned.
 
-    37 add/set-block commands across the production registry became 16: one add and one set per
-    blocks field, seven page-level fields plus one block-bearing element field.
+    One add per blocks field - seven page-level fields plus one block-bearing element field - and
+    no in-place edit at all: a block is replaced by removing it and adding at its slot.
     """
-    add_set = [command.name
-               for page_type in REGISTRY.values()
-               for command in page_type.commands
-               if command.kind in (ADD_BLOCK, SET_BLOCK)]
-    assert len(add_set) == 16
+    adds = [command.name
+            for page_type in REGISTRY.values()
+            for command in page_type.commands
+            if command.kind == ADD_BLOCK]
+    assert len(adds) == 8
     document = {command.name for command in REGISTRY["document"].commands}
-    assert document == {"addBody", "setBodyBlock", "removeBlock", "reorderBlock",
-                        "addLink", "setTitle"}
-
-
-def test_the_per_kind_factories_are_gone():
-    """Deleted outright rather than deprecated - aliases would have left 37 commands standing
-    beside the new 16, which is the opposite of what the feature is for."""
-    import src.pagetypes as pagetypes
-    for name in ("add_block_cmd", "block_cmds", "all_block_cmds", "element_block_cmds"):
-        assert not hasattr(pagetypes, name), f"{name} survived the collapse"
-    assert not hasattr(CommandSpec("x", ADD_BLOCK), "block_kind")
+    assert document == {"addBody", "removeBlock", "reorderBlock", "addLink", "setTitle"}
 
 
 def test_block_command_names_match_the_declared_surface():
-    """Every production add/set name, and the remove/reorder names they sit beside - which are
-    byte-identical to what they were before the collapse."""
+    """Every production add name, and the remove/reorder names it sits beside - which are
+    byte-identical to what they were before the sets were dropped."""
     names = {tag: {command.name for command in page_type.commands}
              for tag, page_type in REGISTRY.items()}
-    assert {"addBody", "setBodyBlock", "removeBlock", "reorderBlock"} <= names["document"]
-    assert {"addDetails", "setDetailsBlock", "removeNote", "reorderNote"} <= names["architecture"]
-    assert {"addDecision", "setDecisionBlock", "removeDecisionBlock", "reorderDecisionBlock",
-            "addConsequences", "setConsequencesBlock", "removeConsequence",
+    assert {"addBody", "removeBlock", "reorderBlock"} <= names["document"]
+    assert {"addDetails", "removeNote", "reorderNote"} <= names["architecture"]
+    assert {"addDecision", "removeDecisionBlock", "reorderDecisionBlock",
+            "addConsequences", "removeConsequence",
             "reorderConsequence"} <= names["decision-record"]
-    assert {"addDesign", "setDesignBlock", "removeDesignBlock", "reorderDesignBlock",
-            "addDecisions", "setDecisionsBlock", "removeDecision",
-            "reorderDecision"} <= names["feature-spec"]
-    assert {"addDataModels", "setDataModelsBlock", "removeDataModel", "reorderDataModel",
-            "addStepDetail", "setStepDetailBlock", "removeStepDetail",
+    assert {"addDesign", "removeDesignBlock", "reorderDesignBlock",
+            "addDecisions", "removeDecision", "reorderDecision"} <= names["feature-spec"]
+    assert {"addDataModels", "removeDataModel", "reorderDataModel",
+            "addStepDetail", "removeStepDetail",
             "reorderStepDetail"} <= names["implementation-plan"]
     # Names stay unique within a type.
     for tag, page_type in REGISTRY.items():
@@ -882,18 +858,16 @@ def test_a_block_argument_is_resolved_from_its_field():
         commands=(
             CommandSpec("addBody", ADD_BLOCK, "add blocks to the body",
                         section="body", field="body",
-                        args=(_array("blocks", content=BLOCK_ARRAY),)),
-            CommandSpec("setBodyBlock", SET_BLOCK, "replace one block in the body",
-                        section="body", field="body",
-                        args=(_text("blockId"), _object("block", content=BLOCK))),
+                        args=(_array("blocks", content=BLOCK_ARRAY), _text("precedingId"))),
+            CommandSpec("removeBlock", REMOVE_BLOCK, "remove a block",
+                        section="body", field="body", args=(_text("blockId"),)),
         ),
         fsm=FSMSpec(name="XTestResolved", initial="active", states=("active",)))
-    add, set_cmd = page_type.commands
+    add, remove = page_type.commands
     assert add.args[0].block_kinds == body.block_vocabulary()
-    assert set_cmd.args[1].block_kinds == body.block_vocabulary()
     assert [kind.kind for kind in add.args[0].block_kinds or ()] == ["code", "paragraph"]
-    # An argument that carries no blocks is returned untouched.
-    assert set_cmd.args[0].block_kinds is None
+    # An argument that carries no blocks is returned untouched, on either command.
+    assert add.args[1].block_kinds is None and remove.args[0].block_kinds is None
 
 
 def _targeted_vocabulary(page_type, command, arg):
@@ -918,12 +892,12 @@ def test_resolution_reproduces_the_declared_vocabularies():
     for page_type in ALL_TYPES.values():
         for command in page_type.commands:
             for arg in command.args:
-                if arg.content not in (BLOCK, BLOCK_ARRAY):
+                if arg.content != BLOCK_ARRAY:
                     continue
                 assert arg.block_kinds == _targeted_vocabulary(page_type, command, arg), (
                     f"{page_type.tag}.{command.name} argument '{arg.name}'")
                 checked += 1
-    assert checked >= 16      # 7 page-level fields x2, plus the element-scoped surface
+    assert checked >= 8       # 7 page-level fields, plus the element-scoped add
 
 
 def test_a_block_argument_that_cannot_be_resolved_is_rejected_at_import():

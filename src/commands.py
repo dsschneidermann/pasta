@@ -20,7 +20,6 @@ from .pagetypes import (
     ADD_BLOCK,
     ADD_ELEMENT,
     ADD_LINK,
-    BLOCK,
     BLOCK_ARRAY,
     COMPOUND,
     ELEMENT_TRANSITION,
@@ -28,7 +27,6 @@ from .pagetypes import (
     REMOVE_ELEMENT,
     REORDER_BLOCK,
     REORDER_ELEMENT,
-    SET_BLOCK,
     SET_ELEMENT_FIELD,
     SET_PROSE,
     SET_SCALAR,
@@ -42,7 +40,6 @@ from .pagetypes import (
     guard_production_type,
     initial_sections,
     is_field_setter,
-    validate_block,
     validate_blocks,
     validate_inline_content,
 )
@@ -217,8 +214,8 @@ def field_setter_edges(page: Page, page_type: PageType,
     single `command` that authors it (see `_field_setter_edge`). A field is one edge naming one
     command, because a field's whole authoring content is reachable in a single command - a blocks
     field takes its blocks as an array, and a list field's add carries the blocks its element is
-    created holding. SET_BLOCK, remove, reorder and the element-scoped block adds are never
-    surfaced here; describeMutations reports them.
+    created holding. remove, reorder and the element-scoped block adds are never surfaced here;
+    describeMutations reports them.
     """
     allowed = fsm.allowed_events(page_type.fsm, page.status) - set(blocked_events)
     required = {
@@ -314,8 +311,6 @@ def _validate_args(command: CommandSpec, args: dict[str, Any]) -> None:
             )
         if arg.content == BLOCK_ARRAY and arg.block_kinds is not None:
             validate_blocks(value, arg.block_kinds)
-        elif arg.content == BLOCK and arg.block_kinds is not None:
-            validate_block(value, arg.block_kinds)
         elif arg.content is not None:
             validate_inline_content(arg.content, value)
 
@@ -395,9 +390,6 @@ def _apply(
         return None, []
     if command.kind == ADD_BLOCK:
         return _add_block(page, command, args, id_factory, batch_context)
-    if command.kind == SET_BLOCK:
-        _set_block(page, command, args)
-        return None, []
     if command.kind == TRANSITION:
         page.status = fsm.fire(page_type.fsm, page.status, command.event)
         return None, []
@@ -512,7 +504,7 @@ def _target_entries(page: Page, command: CommandSpec, args: dict[str, Any]) -> l
 
 def _entry_id(command: CommandSpec, args: dict[str, Any]) -> str:
     """The id of the entry a command targets. args[0] is the id by convention; an element-scoped
-    block command spends args[0] on the element that holds the field, so its entry id is args[1]."""
+    remove/reorder spends args[0] on the element that holds the field, so its entry id is args[1]."""
     return args[command.args[1 if command.element_field is not None else 0].name]
 
 
@@ -648,11 +640,6 @@ def _block_array_arg(command: CommandSpec) -> ArgSpec | None:
     return next((arg for arg in command.args if arg.content == BLOCK_ARRAY), None)
 
 
-def _block_object_arg(command: CommandSpec) -> ArgSpec | None:
-    """The object argument a block set carries its replacement in."""
-    return next((arg for arg in command.args if arg.content == BLOCK), None)
-
-
 def _add_block(page: Page, command: CommandSpec, args: dict[str, Any], id_factory: IdFactory,
                batch_context: BatchContext | None = None) -> tuple[str | None, list[str]]:
     """Add a run of blocks to a blocks field - the section's own, or an element's when the command
@@ -673,30 +660,6 @@ def _add_block(page: Page, command: CommandSpec, args: dict[str, Any], id_factor
     return (created[0] if created else None), created
 
 
-def _set_block(page: Page, command: CommandSpec, args: dict[str, Any]) -> None:
-    """Replace one block by id, preserving its id and its position and nothing else.
-
-    A generalized set is a true overwrite: the supplied block's kind replaces the stored one, so
-    the entry is rebuilt rather than updated in place and no body key from the previous kind
-    survives the change. The only kind rule is that the supplied kind is one the field declares,
-    which validate_block enforced in _validate_args before this ran.
-    """
-    object_arg = _block_object_arg(command)
-    if object_arg is None:                           # unreachable: every set declares one
-        raise ValidationError(f"Command '{command.name}' declares no block argument.")
-    entries = _target_entries(page, command, args)
-    context = _entry_context(command, args)
-    target_id = _entry_id(command, args)
-    supplied = args[object_arg.name]
-    spec = next(kind for kind in (object_arg.block_kinds or ()) if kind.kind == supplied["kind"])
-    for index, entry in enumerate(entries):
-        if entry.get("id") == target_id:
-            rebuilt: dict[str, Any] = {"id": target_id, "kind": spec.kind}
-            for body in spec.body_args():
-                rebuilt[body.name] = supplied.get(body.name)
-            entries[index] = rebuilt
-            return
-    raise NotFoundError(f"No entry with id '{target_id}' in {context}.")
 
 
 def _remove_by_id(page: Page, command: CommandSpec, args: dict[str, Any]) -> None:

@@ -21,7 +21,6 @@ SET_ELEMENT_FIELD = "set_element_field"
 REMOVE_ELEMENT = "remove_element"
 ELEMENT_TRANSITION = "element_transition"   # fire a list element's own FSM (todo->done, ...)
 ADD_BLOCK = "add_block"                      # append to a `blocks` field, or positioned insert (index + precedingId)
-SET_BLOCK = "set_block"                      # replace a block in place by id (id + kind preserved)
 REMOVE_BLOCK = "remove_block"
 REORDER_ELEMENT = "reorder_element"          # move one element to an anchored position in a `list` field
 REORDER_BLOCK = "reorder_block"              # move one block to an anchored position in a `blocks` field
@@ -59,7 +58,6 @@ TABLE_ALIGN = "table_align"            # value: ["left"|"center"|"right"|None, .
 # A LIST add's create-with-content argument: the blocks an element is created holding, so making
 # an element and filling it is one command and a batch never names an id it has not committed.
 BLOCK_ARRAY = "block_array"            # value: [{"kind": <kind>, ...that kind's body args}, ...]
-BLOCK = "block"                        # value: {"kind": <kind>, ...that kind's body args}
 
 _ALIGN_VALUES = ("left", "center", "right", None)
 # Markdown emphasis/code/link tokens rejected inside a plain-text run. Kept deliberately narrow

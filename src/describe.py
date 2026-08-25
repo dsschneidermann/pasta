@@ -11,7 +11,7 @@ from typing import Any
 
 from .commands import legal_commands
 from .model import Page
-from .pagetypes import (BLOCK, BLOCKS, BLOCK_ARRAY, COMPOUND, TRANSITION, BlockKindSpec, CommandSpec,
+from .pagetypes import (BLOCKS, BLOCK_ARRAY, COMPOUND, TRANSITION, BlockKindSpec, CommandSpec,
                         PageType)
 
 
@@ -41,8 +41,6 @@ def command_arg_schema(command: CommandSpec) -> dict[str, Any]:
         prop: dict[str, Any] = {"type": arg.type}
         if arg.content == BLOCK_ARRAY and arg.block_kinds is not None:
             prop = {"type": "array", "items": _block_schema(arg.block_kinds)}
-        elif arg.content == BLOCK and arg.block_kinds is not None:
-            prop = _block_schema(arg.block_kinds)
         if arg.choices is not None:
             prop["enum"] = list(arg.choices)
         if arg.description:

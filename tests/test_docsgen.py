@@ -223,12 +223,14 @@ def test_field_line_omits_block_kinds_for_a_non_blocks_field():
 
 
 def test_generated_docs_name_no_deleted_block_command():
-    """The per-kind commands are gone; a generated page still naming one would send an authoring
-    agent at a command that does not exist."""
+    """The per-kind commands and every block set are gone; a generated page still naming one
+    would send an authoring agent at a command that does not exist."""
     deleted = ("addParagraph", "addHeading", "addDivider", "addQuote", "addTable",
                "addDetailParagraph", "addDetailCode", "addNoteCode", "addDesignCode",
                "addDecisionCode", "addDecisionBlock", "setParagraph", "setHeading",
-               "setDetailParagraph", "setDetailCode")
+               "setDetailParagraph", "setDetailCode",
+               "setBodyBlock", "setDetailsBlock", "setDecisionBlock", "setConsequencesBlock",
+               "setDesignBlock", "setDecisionsBlock", "setDataModelsBlock", "setStepDetailBlock")
     pages = all_state_docs()
     assert pages
     for name, text in pages.items():

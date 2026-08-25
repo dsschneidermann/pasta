@@ -32,10 +32,10 @@ class ArgSpec:
     choices: tuple[str, ...] | None = None
     description: str = ""
     # for an `array` arg carrying inline runs: which inline-run shape it must satisfy
-    # (INLINE_RUNS / INLINE_RUN_LISTS / INLINE_RUN_GRID / TABLE_ALIGN / BLOCK_ARRAY / BLOCK).
+    # (INLINE_RUNS / INLINE_RUN_LISTS / INLINE_RUN_GRID / TABLE_ALIGN / BLOCK_ARRAY).
     # None = no shape check.
     content: str | None = None
-    # for a BLOCK / BLOCK_ARRAY arg: the vocabulary it accepts, copied from the field's declaration
+    # for a BLOCK_ARRAY arg: the vocabulary it accepts, copied from the field's declaration
     # - what makes the value checkable, and what describe reads to build the arg's schema
     block_kinds: tuple[BlockKindSpec, ...] | None = None
 
@@ -61,9 +61,9 @@ class CommandSpec:
     # for SET_ELEMENT_FIELD / ELEMENT_TRANSITION: literal (elementField, value) pairs to stamp
     # onto the target element (the flag-setting shape).
     element_const: tuple[tuple[str, Any], ...] = ()
-    # for ADD_BLOCK / SET_BLOCK / REMOVE_BLOCK / REORDER_BLOCK: the LIST element field holding the
-    # blocks. None = the section's own blocks field. When set, args[0] is the element id and - for
-    # set/remove/reorder - args[1] is the block id.
+    # for ADD_BLOCK / REMOVE_BLOCK / REORDER_BLOCK: the LIST element field holding the blocks.
+    # None = the section's own blocks field. When set, args[0] is the element id and - for
+    # remove/reorder - args[1] is the block id.
     element_field: str | None = None
     # for COMPOUND: ordered sub-commands applied atomically. (ELEMENT_TRANSITION fires the
     # element-FSM event named in `event` on the target element.)

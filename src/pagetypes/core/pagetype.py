@@ -16,7 +16,6 @@ from .args import ArgSpec, CommandSpec
 from .fields import FieldSpec, SectionSpec
 from .specs import (
     ADD_ELEMENT,
-    BLOCK,
     BLOCKS,
     BLOCK_ARRAY,
     COMPOUND,
@@ -68,7 +67,7 @@ class PageType:
         block, describe itself as an untyped array, and lose its cross-page ref check, with
         nothing raising anywhere.
         """
-        if arg.content not in (BLOCK, BLOCK_ARRAY):
+        if arg.content != BLOCK_ARRAY:
             return arg
         if command.section is None or command.field is None:
             raise ValueError(

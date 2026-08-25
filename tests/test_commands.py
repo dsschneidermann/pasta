@@ -640,7 +640,7 @@ def test_is_field_setter_classifies_by_kind():
     # A page-level blocks add is now an ordinary field setter: one add per field, so it names
     # exactly one command in `do`.
     assert is_field_setter(blocks.command("addBody"))             # ADD_BLOCK, page-level
-    assert not is_field_setter(blocks.command("setBodyBlock"))    # SET_BLOCK is never a setter
+    assert not is_field_setter(blocks.command("removeBlock"))     # REMOVE_BLOCK
     element_blocks = get_page_type("test-element-blocks")
     # An element-scoped add fills an element that must exist first, so it is not a stage's work.
     assert not is_field_setter(element_blocks.command("addItemDetail"))
@@ -678,7 +678,7 @@ def _field_setter_page(seal: PageType, status: str) -> Page:
 
 def test_field_setter_edges_group_blocks_and_carry_instructions():
     """Every field surfaces as one `do` entry naming one command - a blocks field's single add
-    (never SET_BLOCK/remove/reorder) or a prose/scalar setter. Each carries the field's FieldSpec
+    (never its remove/reorder) or a prose/scalar setter. Each carries the field's FieldSpec
     instruction inline."""
     seal = _field_setter_page_type()
     edges = field_setter_edges(_field_setter_page(seal, "draft"), seal)
@@ -861,55 +861,36 @@ def test_add_block_run_inserts_at_the_anchored_slot():
                           {"blocks": [], "precedingId": first}, factory)
 
 
-def test_set_block_changes_a_kind_in_place():
-    """A generalized set is a true overwrite: same id, same slot, no key of the old kind left."""
+def test_a_page_level_add_rejects_a_kind_the_field_does_not_declare():
+    factory = make_counter()
+    page = _unified_page(factory)
+    with pytest.raises(ValidationError, match="not accepted here"):
+        _ = apply_command(page, UNIFIED, "addBody",
+                          {"blocks": [{"kind": "nope", "text": "x"}]}, factory)
+
+
+def test_a_block_is_replaced_by_removing_it_and_adding_at_its_slot():
+    """There is no in-place edit. Replacing a block is remove plus a positioned add, which
+    keeps its slot and its neighbours - and gives it a NEW id, the whole cost of dropping the
+    set."""
     factory = make_counter()
     page = _unified_page(factory)
     page = apply_command(page, UNIFIED, "addBody", {"blocks": [
-        {"kind": "paragraph", "inlines": ["prose"]},
-        {"kind": "code", "language": "py", "source": "x = 1"},
+        {"kind": "paragraph", "inlines": ["first"]},
+        {"kind": "paragraph", "inlines": ["second"]},
+        {"kind": "paragraph", "inlines": ["third"]},
     ]}, factory).page
-    paragraph_id = _body(page)[0]["id"]
-    edited = apply_command(page, UNIFIED, "setBodyBlock", {
-        "blockId": paragraph_id,
-        "block": {"kind": "code", "language": "sh", "source": "ls"},
+    first, second, third = (block["id"] for block in _body(page))
+    page = apply_command(page, UNIFIED, "removeBlock", {"blockId": second}, factory).page
+    replaced = apply_command(page, UNIFIED, "addBody", {
+        "blocks": [{"kind": "code", "language": "sh", "source": "ls"}],
+        "index": 1, "precedingId": first,
     }, factory)
-    blocks = _body(edited.page)
-    assert len(blocks) == 2
-    assert blocks[0]["id"] == paragraph_id          # id preserved
-    assert blocks[0]["kind"] == "code"              # kind changed in place
-    assert blocks[0]["source"] == "ls"
-    assert "inlines" not in blocks[0]               # nothing of the paragraph survives
-
-
-def test_set_block_rejects_a_kind_the_field_does_not_declare():
-    factory = make_counter()
-    page = _unified_page(factory)
-    page = apply_command(page, UNIFIED, "addBody", {
-        "blocks": [{"kind": "paragraph", "inlines": ["prose"]}]}, factory).page
-    block_id = _body(page)[0]["id"]
-    with pytest.raises(ValidationError, match="not accepted here"):
-        _ = apply_command(page, UNIFIED, "setBodyBlock", {
-            "blockId": block_id, "block": {"kind": "nope", "text": "x"}}, factory)
-    with pytest.raises(NotFoundError):
-        _ = apply_command(page, UNIFIED, "setBodyBlock", {
-            "blockId": "no-such-block",
-            "block": {"kind": "paragraph", "inlines": ["x"]}}, factory)
-
-
-def test_set_block_gives_a_divider_the_set_it_never_had():
-    """The per-kind surface gave a body-less kind an add and no set, so a divider could not be
-    edited at all. The generalized set covers every kind the field declares."""
-    factory = make_counter()
-    page = _unified_page(factory)
-    page = apply_command(page, UNIFIED, "addBody",
-                         {"blocks": [{"kind": "divider"}]}, factory).page
-    divider_id = _body(page)[0]["id"]
-    edited = apply_command(page, UNIFIED, "setBodyBlock", {
-        "blockId": divider_id,
-        "block": {"kind": "paragraph", "inlines": ["now prose"]}}, factory)
-    assert _body(edited.page)[0] == {
-        "id": divider_id, "kind": "paragraph", "inlines": ["now prose"]}
+    blocks = _body(replaced.page)
+    assert [block["id"] for block in blocks] == [first, replaced.created_id, third]
+    assert replaced.created_id != second        # a replacement is a new block, not an edit
+    assert blocks[1] == {"id": replaced.created_id, "kind": "code",
+                         "language": "sh", "source": "ls"}
 
 
 def test_a_bad_table_inside_a_page_level_add_still_raises():
@@ -1047,30 +1028,16 @@ def test_add_and_set_a_block_on_an_element():
     assert element["snippet"] == []
 
 
-def test_set_a_block_on_an_element_may_change_its_kind():
+def test_an_element_scoped_add_is_held_to_the_element_fields_vocabulary():
+    """The kind rule one level deeper is the same one: `detail` declares paragraph, code and
+    list, so a table is refused there just as it is at the page level."""
     factory = make_counter()
     page, item_id = new_item(factory)
-    added = apply_command(page, ELEMENT_BLOCKS, "addItemDetail",
-                          {"itemId": item_id, "blocks": [{"kind": "code", "language": "python", "source": "x = 1"}]}, factory)
-    block_id = added.created_id
-    edited = apply_command(added.page, ELEMENT_BLOCKS, "setItemDetailBlock",
-                           {"itemId": item_id, "blockId": block_id, "block": {"kind": "code", "language": "python", "source": "x = 2"}}, factory)
-    assert items_of(edited.page)[0]["detail"] == [
-        {"id": block_id, "kind": "code", "language": "python", "source": "x = 2"}
-    ]
-    # A set is a true overwrite: the same block becomes a paragraph, keeping its id and slot,
-    # with no key of the code block left behind.
-    retyped = apply_command(edited.page, ELEMENT_BLOCKS, "setItemDetailBlock",
-                            {"itemId": item_id, "blockId": block_id,
-                             "block": {"kind": "paragraph", "inlines": ["nope"]}}, factory)
-    assert items_of(retyped.page)[0]["detail"] == [
-        {"id": block_id, "kind": "paragraph", "inlines": ["nope"]}
-    ]
-    # The one kind rule left is the field's vocabulary - `detail` does not accept a table.
     with pytest.raises(ValidationError, match="not accepted here"):
-        _ = apply_command(retyped.page, ELEMENT_BLOCKS, "setItemDetailBlock",
-                          {"itemId": item_id, "blockId": block_id,
-                           "block": {"kind": "table", "header": [["A"]], "rows": [[["1"]]]}}, factory)
+        _ = apply_command(page, ELEMENT_BLOCKS, "addItemDetail",
+                          {"itemId": item_id,
+                           "blocks": [{"kind": "table", "header": [["A"]], "rows": [[["1"]]]}]},
+                          factory)
 
 
 def test_remove_and_reorder_blocks_on_an_element():
@@ -1202,20 +1169,6 @@ def test_a_field_override_is_enforced_at_the_command():
                           {"blocks": [{"kind": "paragraph", "text": "plain prose"}]}, factory)
 
 
-def test_a_custom_kind_is_settable_like_any_other():
-    """test-child's `decision` had no in-place set at all under the per-kind surface."""
-    factory = make_counter()
-    child = create_page(CHILD_BLOCKS, "Child", None, factory)
-    added = apply_command(child, CHILD_BLOCKS, "addDecisions", {"blocks": [
-        {"kind": "decision", "questionId": "q:1", "text": "first"}]}, factory)
-    block_id = added.created_id
-    edited = apply_command(added.page, CHILD_BLOCKS, "setDecisionsBlock", {
-        "blockId": block_id,
-        "block": {"kind": "decision", "questionId": "q:2", "text": "second"}}, factory)
-    assert edited.page.sections["decisions"]["body"] == [
-        {"id": block_id, "kind": "decision", "questionId": "q:2", "text": "second"}]
-
-
 def test_a_block_is_built_in_exactly_one_place():
     """A block created by a page-level add, an element-scoped add, and an element carrying its
     content is identical key for key - including an omitted optional stored as None."""
@@ -1296,10 +1249,10 @@ def test_every_declared_content_shape_is_checked_through_the_array_path():
     with pytest.raises(ValidationError, match="Markdown syntax"):
         _ = apply_command(page, UNIFIED, "addBody", {"blocks": [
             {"kind": "table", "header": [["A"]], "rows": [[["a `code` cell"]]]}]}, factory)
-    # The same rules on the SET, since both run one validator.
-    added = apply_command(page, UNIFIED, "addBody",
-                          {"blocks": [{"kind": "paragraph", "inlines": ["ok"]}]}, factory)
+    # The same rules on an element-scoped add, since every block path runs one validator.
+    element_page, item_id = new_item(factory)
     with pytest.raises(ValidationError, match="Markdown syntax"):
-        _ = apply_command(added.page, UNIFIED, "setBodyBlock", {
-            "blockId": added.created_id,
-            "block": {"kind": "list", "ordered": False, "items": [["a **bold** item"]]}}, factory)
+        _ = apply_command(element_page, ELEMENT_BLOCKS, "addItemDetail", {
+            "itemId": item_id,
+            "blocks": [{"kind": "list", "ordered": False,
+                        "items": [["a **bold** item"]]}]}, factory)

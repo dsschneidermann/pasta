@@ -14,7 +14,6 @@ from .args import BlockKindSpec, CommandSpec
 from .commands import is_field_setter
 from .specs import ADD_ELEMENT, SET_PROSE, SET_SCALAR
 from .specs import (
-    BLOCK,
     BLOCK_ARRAY,
     INLINE_RUNS,
     INLINE_RUN_GRID,
@@ -155,10 +154,10 @@ def collect_ref_ids(content: str, value: Any,
     as the existing cross-page ref check does; a malformed run is left for that validation to reject.
     `TABLE_ALIGN` carries no runs, so it yields nothing.
 
-    `kinds` is the vocabulary of a BLOCK / BLOCK_ARRAY arg. Without it there is no way to know
-    which of a block's keys hold runs, so those shapes yield nothing rather than guessing - and
-    reading the body args off the vocabulary rather than BLOCK_ARGS is what keeps an overridden
-    kind's runs reachable.
+    `kinds` is the vocabulary of a BLOCK_ARRAY arg. Without it there is no way to know which of a
+    block's keys hold runs, so that shape yields nothing rather than guessing - and reading the
+    body args off the vocabulary rather than BLOCK_ARGS is what keeps an overridden kind's runs
+    reachable.
     """
     ids: list[str] = []
 
@@ -181,8 +180,6 @@ def collect_ref_ids(content: str, value: Any,
         # see them and a dangling ref would be written.
         for entry in value if isinstance(value, list) else []:
             ids.extend(_block_ref_ids(entry, kinds))
-    elif content == BLOCK:
-        ids.extend(_block_ref_ids(value, kinds))
     return ids
 
 
@@ -246,7 +243,7 @@ def validate_pagetype_setter_descriptions(page_type: PageType) -> None:
     does ('set the summary', 'add a constraint'), never its field's authoring instruction: that
     lives once on the FieldSpec.description, and reaches an agent through describePageType's
     `sections` listing and the `instruction` key of a `next` field edge. Freeform blocks
-    (ADD_BLOCK / SET_BLOCK) already carry a short description and are untouched.
+    (ADD_BLOCK) already carry a short description and are untouched.
     """
     for command in page_type.commands:
         if command.kind not in (SET_SCALAR, SET_PROSE, ADD_ELEMENT):

@@ -13,7 +13,6 @@ from .args import (
     CommandSpec,
     _array,
     _integer,
-    _object,
     _same_named,
     _text,
 )
@@ -21,7 +20,6 @@ from .fields import FieldSpec, SectionSpec
 from .specs import (
     ADD_BLOCK,
     ADD_ELEMENT,
-    BLOCK,
     BLOCKS,
     BLOCK_ARRAY,
     COMPOUND,
@@ -32,7 +30,6 @@ from .specs import (
     REMOVE_ELEMENT,
     REORDER_BLOCK,
     REORDER_ELEMENT,
-    SET_BLOCK,
     SET_ELEMENT_FIELD,
     SET_PROSE,
     SET_SCALAR,
@@ -189,11 +186,11 @@ def is_field_setter(command: CommandSpec) -> bool:
     """Whether `command` writes typed field content into a (section, field).
 
     A SET_SCALAR, a SET_PROSE, an ADD_ELEMENT (including the element-FSM adds addStep / addCase /
-    askQuestion), or a page-level ADD_BLOCK. Not setters: SET_BLOCK (an edit of one existing
-    block), an element-scoped ADD_BLOCK (the element it fills must exist first, so it is not a
-    stage's own work), REMOVE_* / REORDER_* (structure, not content), SET_ELEMENT_FIELD (a flag on
-    an existing element), ELEMENT_TRANSITION (fires an element's own FSM), TRANSITION / COMPOUND
-    (page-status edges), and the universal ADD_LINK / SET_TITLE.
+    askQuestion), or a page-level ADD_BLOCK. Not setters: an element-scoped ADD_BLOCK (the element
+    it fills must exist first, so it is not a stage's own work), REMOVE_* / REORDER_* (structure,
+    not content), SET_ELEMENT_FIELD (a flag on an existing element), ELEMENT_TRANSITION (fires an
+    element's own FSM), TRANSITION / COMPOUND (page-status edges), and the universal ADD_LINK /
+    SET_TITLE.
 
     The page-type-agnostic classifier behind the self-direction `do` list, where each field gets
     one entry naming the one command that authors it. It lives here rather than beside that
@@ -206,24 +203,28 @@ def is_field_setter(command: CommandSpec) -> bool:
 
 
 def blocks_cmds(section: str, *, field: str = "body", label: str | None = None,
-                add_name: str | None = None, set_name: str | None = None,
+                add_name: str | None = None,
                 remove_name: str = "removeBlock", remove_desc: str = "remove a block",
                 reorder_name: str = "reorderBlock", reorder_desc: str | None = None,
                 legal_in: tuple[str, ...] | None = None) -> tuple[CommandSpec, ...]:
-    """A blocks field's whole authoring surface: add, set, remove, reorder - four commands.
+    """A blocks field's whole authoring surface: add, remove, reorder - three commands.
 
-    The field declares its vocabulary once and PageType resolves it onto these arguments, so the
-    commands and the validator read one declaration. A block's kind travels as data inside the
-    argument, which is what replaces one add (and one set) per kind.
+    The field declares its vocabulary once and PageType resolves it onto the add's argument, so
+    the command and the validator read one declaration. A block's kind travels as data inside the
+    argument, which is what replaces one add per kind.
 
         add -> add<Label>(blocks, index?, precedingId?)      ADD_BLOCK
-        set -> set<Label>Block(blockId, block)               SET_BLOCK
+
+    There is no in-place edit: a block is replaced by removing it and adding at its slot, which
+    the add's `index` / `precedingId` already express. The replacement is a new block with a new
+    id, and that is the whole rule - a block is created as part of a run and afterwards only ever
+    addressed, moved or dropped by id.
 
     `Label` follows _setter_label - the section for the conventional `body` field, the field key
-    otherwise - so a call carries no name plumbing; `label=` / `add_name=` / `set_name=` override
-    where the derivation reads badly. remove and reorder keep the names, defaults and argument
-    shapes they have always had. A type with more than one blocks field passes distinct
-    remove_name / reorder_name so command names stay unique.
+    otherwise - so a call carries no name plumbing; `label=` / `add_name=` override where the
+    derivation reads badly. remove and reorder keep the names, defaults and argument shapes they
+    have always had. A type with more than one blocks field passes distinct remove_name /
+    reorder_name so command names stay unique.
     """
     noun = _setter_label(section, field, label)
     cap = _cap(noun)
@@ -236,28 +237,20 @@ def blocks_cmds(section: str, *, field: str = "body", label: str | None = None,
                      description="the blocks to add, each naming its own kind"),
               _INDEX, _PRECEDING),
         legal_in=legal_in)
-    set_cmd = CommandSpec(
-        set_name or f"set{cap}Block", SET_BLOCK, f"replace one block in the {noun}",
-        section=section, field=field,
-        args=(_text("blockId"),
-              _object("block", content=BLOCK,
-                      description="the replacement block, naming its own kind")),
-        legal_in=legal_in)
     remove = CommandSpec(remove_name, REMOVE_BLOCK, remove_desc, section=section, field=field,
                          args=(_text("blockId"),), legal_in=legal_in)
     reorder = CommandSpec(reorder_name, REORDER_BLOCK, reorder_desc, section=section, field=field,
                           args=(_text("blockId"), _integer("toIndex"), _PRECEDING),
                           legal_in=legal_in)
-    return (add, set_cmd, remove, reorder)
+    return (add, remove, reorder)
 
 
 def element_blocks_cmds(section: str, element_field: str, *, field: str = "items",
                         singular: str | None = None,
                         legal_in: tuple[str, ...] | None = None) -> tuple[CommandSpec, ...]:
-    """The same four commands for one block-bearing element field, each led by the element id.
+    """The same three commands for one block-bearing element field, each led by the element id.
 
         add     -> add<Noun><Field>(<noun>Id, blocks, index?, precedingId?)
-        set     -> set<Noun><Field>Block(<noun>Id, blockId, block)
         remove  -> remove<Field>Block(<noun>Id, blockId)
         reorder -> reorder<Field>Block(<noun>Id, blockId, toIndex, precedingId?)
 
@@ -280,13 +273,6 @@ def element_blocks_cmds(section: str, element_field: str, *, field: str = "items
                           _array("blocks", content=BLOCK_ARRAY,
                                  description="the blocks to add, each naming its own kind"),
                           _INDEX, _PRECEDING),
-                    legal_in=legal_in),
-        CommandSpec(f"set{cap}{fcap}Block", SET_BLOCK,
-                    f"replace one block in {_a(noun)} {noun}'s {element_field}",
-                    section=section, field=field, element_field=element_field,
-                    args=(_text(id_arg), _text("blockId"),
-                          _object("block", content=BLOCK,
-                                  description="the replacement block, naming its own kind")),
                     legal_in=legal_in),
         CommandSpec(f"remove{cap}{fcap}", REMOVE_BLOCK,
                     f"remove a block from {_a(noun)} {noun}'s {element_field}",

@@ -1484,27 +1484,24 @@ def test_a_ref_checked_block_is_checked_when_created_with_its_element(store):
     assert page.sections["decisions"]["body"][0]["questionId"] == asked[0]
 
 
-def test_a_dangling_ref_in_a_set_block_aborts_the_batch(store):
-    """The generalized set carries a block too, so it gets the same per-block check."""
+def test_a_dangling_ref_in_a_later_add_aborts_the_whole_batch(store):
+    """A block already written by an earlier command in the batch is rolled back with it - the
+    per-block check runs before anything commits."""
     workspace = store.create_workspace("demo")
     result = store.create_page(workspace.id, "test-lifecycle", "Dark mode")
     parent, child = result.page, _child(result, "test-child")
     _, asked = store.mutate_page_batch(workspace.id, parent.id, [
         {"command": "askQuestion", "args": {"text": "contrast?"}}
     ])
-    page, created = store.mutate_page_batch(workspace.id, child.id, [
-        {"command": "addDecisions", "args": {"blocks": [
-            {"kind": "decision", "questionId": asked[0], "text": "first"}]}}
-    ])
-    block_id = page.sections["decisions"]["body"][0]["id"]
     with pytest.raises(ValidationError, match="does not reference an existing element"):
         store.mutate_page_batch(workspace.id, child.id, [
-            {"command": "setDecisionsBlock", "args": {
-                "blockId": block_id,
-                "block": {"kind": "decision", "questionId": "nope", "text": "x"}}}
+            {"command": "addDecisions", "args": {"blocks": [
+                {"kind": "decision", "questionId": asked[0], "text": "first"}]}},
+            {"command": "addDecisions", "args": {"blocks": [
+                {"kind": "decision", "questionId": "nope", "text": "second"}]}},
         ])
-    # Nothing was written: the original block is untouched.
-    assert store.get_page(workspace.id, child.id).sections["decisions"]["body"][0]["text"] == "first"
+    # Nothing was written, not even the first command's block.
+    assert store.get_page(workspace.id, child.id).sections["decisions"]["body"] == []
 
 
 def test_a_ref_checked_block_created_with_its_element_is_checked(store):

@@ -168,11 +168,11 @@ def test_a_blocks_add_describes_its_whole_vocabulary():
     table = next(b for b in branches if b["properties"]["kind"]["const"] == "table")
     assert "align" in table["properties"] and "align" not in table["required"]   # optional
 
-    # The set carries the same oneOf, as a single object rather than an array.
-    block = commands["setBodyBlock"]["args"]["properties"]["block"]
-    assert "oneOf" in block and "items" not in block
-    assert [b["properties"]["kind"]["const"] for b in block["oneOf"]] == [
-        branch["properties"]["kind"]["const"] for branch in branches]
+    # The add is the only place a vocabulary is advertised - nothing else carries blocks.
+    carriers = [c["name"] for c in described["commands"]
+                if any("oneOf" in prop or "oneOf" in prop.get("items", {})
+                       for prop in c["args"]["properties"].values())]
+    assert carriers == ["addBody"]
 
 
 def test_an_overridden_kind_advertises_its_own_args():
