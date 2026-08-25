@@ -58,6 +58,11 @@ _SIMPLE_CHANGE = PageType(
                 that must keep working. A criterion that can only be settled by opinion is not one.
                 """),
         )),
+        SectionSpec("pull_request", "Pull Request", (
+            _scalar("url", description="""
+                The pull request URL created for this change.
+                """),
+        )),
         SectionSpec("resolution", "Resolution", (
             _list("changeCommits", element_fields=("sha", "message", "url"), description="""
                 Each a commit that delivers this change, recorded as it is closed: the sha, its
@@ -71,6 +76,8 @@ _SIMPLE_CHANGE = PageType(
         set_prose_cmd("motivation"),
         *list_cmds("acceptance", field="criteria", singular="criterion", label="acceptance criterion",
                    add_args=(_text(),)),
+        set_scalar_cmd("pull_request", "url", name="setPullRequestUrl", label="pull request url",
+                       legal_in=("review", "done")),
         transition_cmd("open", "draft -> open"),
         transition_cmd("submitForReview", "open -> review"),
         # review -> done marks the change built and reviewed, but not yet shippable or merged to main.

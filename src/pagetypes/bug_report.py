@@ -67,6 +67,11 @@ _BUG_REPORT = PageType(
                 reproduces every time or intermittently.
                 """),
         )),
+        SectionSpec("pull_request", "Pull Request", (
+            _scalar("url", description="""
+                The pull request URL created for this fix.
+                """),
+        )),
         SectionSpec("resolution", "Resolution", (
             _list("fixCommits", element_fields=("sha", "message", "url"), description="""
                 Each a commit that fixes this defect, recorded as the bug is closed: the sha, its
@@ -82,6 +87,8 @@ _BUG_REPORT = PageType(
         set_prose_cmd("summary"),
         *list_cmds("repro", field="steps", label="repro step",
                    add_args=(_text(),)),
+        set_scalar_cmd("pull_request", "url", name="setPullRequestUrl", label="pull request url",
+                       legal_in=("review", "done")),
         set_prose_cmd("expected"),
         set_prose_cmd("observed"),
         transition_cmd("open", "draft -> open"),

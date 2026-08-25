@@ -165,6 +165,11 @@ _FEATURE_BRIEF = PageType(
                 this record agree. Say where it applies, by step or spec section.
                 """),
         )),
+        SectionSpec("pull_request", "Pull Request", (
+            _scalar("url", description="""
+                The pull request URL created for this feature review.
+                """),
+        )),
         SectionSpec("commits", "Commits", (
             _list("items", element_fields=("sha", "message", "url", "stale"), description="""
                 Each a commit made for this feature while building: its sha, subject line, and a url
@@ -197,6 +202,8 @@ _FEATURE_BRIEF = PageType(
                              _text("action", required=False, choices=_FINDING_ACTIONS,
                                    description="how the finding was applied to the plan")),
                    legal_in=("planReview",)),
+        set_scalar_cmd("pull_request", "url", name="setPullRequestUrl", label="pull request url",
+                       legal_in=("review",)),
         *list_cmds("commits", add_name="recordCommit", label="recorded commit", remove=False,
                    add_args=(_text("sha"), _text("message"), _text("url", required=False)),
                    legal_in=_COMMIT_LOG_STATES),
