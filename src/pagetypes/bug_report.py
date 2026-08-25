@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ._stage_guidance import BUG_REPORT_DRAFT, BUG_REPORT_OPEN, REVIEW
 from . import (
     FSMSpec,
     PageType,
@@ -84,8 +85,10 @@ _BUG_REPORT = PageType(
         set_prose_cmd("expected"),
         set_prose_cmd("observed"),
         transition_cmd("open", "draft -> open"),
-        # open -> done marks the fix built but not yet verified as shippable or merged to main.
-        transition_cmd("markDone", "open -> done"),
+        transition_cmd("submitForReview", "open -> review"),
+        # review -> done marks the fix built and reviewed, but not yet shippable or merged to main.
+        transition_cmd("markDone", "review -> done"),
+        transition_cmd("requestChanges", "review -> open", agency="either"),
         # close is a human gate: a person confirms the fix is shippable/merged before it lands.
         transition_on_add_cmd("close", "done -> closed", section="resolution", field="fixCommits",
                      description="record a fix commit AND close the bug", agency="human",
@@ -102,6 +105,11 @@ _BUG_REPORT = PageType(
     fsm=FSMSpec(
         name="BugReport",
         initial="draft",
-        states=("draft", "open", "done", "closed"),
+        states=("draft", "open", "review", "done", "closed"),
+        state_guidance=(
+            ("draft", BUG_REPORT_DRAFT),
+            ("open", BUG_REPORT_OPEN),
+            ("review", REVIEW),
+        ),
     ),
 )

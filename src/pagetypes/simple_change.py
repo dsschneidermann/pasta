@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ._stage_guidance import REVIEW, SIMPLE_CHANGE_DRAFT, SIMPLE_CHANGE_OPEN
 from . import (
     FSMSpec,
     PageType,
@@ -24,7 +25,8 @@ _SIMPLE_CHANGE = PageType(
     name="Simple change",
     description=(
         "Tracks a small, self-contained change or minor feature through a lightweight flow "
-        "(draft -> open -> done -> closed) - no planning, spec, testing, or review gates. Use this "
+        "(draft -> open -> review -> done -> closed) - no planning, spec or testing gates, but the "
+        "work is still reviewed before it is marked done. Use this "
         "page type ONLY when the user specifically asks to make a small/simple change or a small/simple "
         "feature; for larger work create a feature-brief, and for a defect in existing behavior use "
         "a bug-report."
@@ -70,8 +72,10 @@ _SIMPLE_CHANGE = PageType(
         *list_cmds("acceptance", field="criteria", singular="criterion", label="acceptance criterion",
                    add_args=(_text(),)),
         transition_cmd("open", "draft -> open"),
-        # open -> done marks the change built but not yet verified as shippable or merged to main.
-        transition_cmd("markDone", "open -> done"),
+        transition_cmd("submitForReview", "open -> review"),
+        # review -> done marks the change built and reviewed, but not yet shippable or merged to main.
+        transition_cmd("markDone", "review -> done"),
+        transition_cmd("requestChanges", "review -> open", agency="either"),
         # close is a human gate: a person confirms the change is shippable/merged before it lands.
         transition_on_add_cmd("close", "done -> closed", section="resolution", field="changeCommits",
                      description="record a change commit AND close the change", agency="human",
@@ -88,6 +92,11 @@ _SIMPLE_CHANGE = PageType(
     fsm=FSMSpec(
         name="SimpleChange",
         initial="draft",
-        states=("draft", "open", "done", "closed"),
+        states=("draft", "open", "review", "done", "closed"),
+        state_guidance=(
+            ("draft", SIMPLE_CHANGE_DRAFT),
+            ("open", SIMPLE_CHANGE_OPEN),
+            ("review", REVIEW),
+        ),
     ),
 )

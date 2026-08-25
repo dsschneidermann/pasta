@@ -7,6 +7,8 @@ new or removed production type still fails loudly. The content-specific assertio
 pin to the test fixtures (src.testtypes), so enriching a production type never breaks them.
 """
 
+from textwrap import dedent
+
 import pytest
 
 from src.commands import is_field_setter
@@ -66,6 +68,7 @@ from src.pagetypes import (
     validate_table,
     FSMSpec,
 )
+from src.pagetypes import _stage_guidance
 from src.testtypes import TEST_REGISTRY
 
 def _kinds(*names: str) -> tuple[BlockKindSpec, ...]:
@@ -496,6 +499,20 @@ def test_state_guidance_rejects_duplicate_state():
     with pytest.raises(ValueError, match="twice"):
         FSMSpec(name="G", initial="a", states=("a",),
                 state_guidance=(("a", "x"), ("a", "y")))
+
+
+def test_every_production_guidance_text_comes_from_the_stage_guidance_module():
+    # A page-type module declaring its own inline text is the thing this rules out: the
+    # constants are normalized here the same way FSMSpec normalizes what it is handed.
+    constants = {dedent(value.strip("\n")).rstrip()
+                 for name, value in vars(_stage_guidance).items()
+                 if name.isupper() and isinstance(value, str)}
+    declared = [(tag, state, text)
+                for tag, page_type in REGISTRY.items()
+                for state, text in page_type.fsm.state_guidance]
+    assert declared, "no production page type declares stage guidance"
+    for tag, state, text in declared:
+        assert text in constants, f"{tag}.{state} guidance is not a _stage_guidance constant"
 
 
 # --- A block kind's declared vocabulary ---------------------------------------

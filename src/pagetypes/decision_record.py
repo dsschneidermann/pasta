@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ._stage_guidance import DECISION_RECORD_AUTHORING
 from . import (
     FSMSpec,
     PageType,
@@ -116,26 +117,6 @@ _DECISION_RECORD = PageType(
         initial="authoring",
         states=("authoring", "accepted"),
         terminal_states=("accepted",),
-        state_guidance=(("authoring", """
-            authoring - captures why one decision was taken, while the reasons are still in
-            someone's head. The shape it produces belongs on an architecture page; the reasoning
-            that shape cannot show belongs here. The work of it:
-
-            - One decision per record, titled with the position taken rather than the topic:
-              "store sessions in the database", not "session storage".
-            - Write the context first, for someone who was not there: the forces, the
-              constraints, what was traded against what. It is worth the most in a year and
-              skipped the most often.
-            - State the decision in the active voice, before any detail. A reader should not
-              have to infer it from a discussion of the options.
-            - Record the options weighed and what ruled each out. Without a rejected
-              alternative, nothing stops the question being reopened.
-            - Give consequences both ways. Only benefits reads as advocacy to whoever inherits
-              the cost.
-            - Say where the decision moves the line between pure logic and effectful code - an
-              architecture page can show that boundary but not explain it.
-            - Fill in date, scope and deciders, so a later reader can weigh how much still
-              applies.
-            """),),
+        state_guidance=(("authoring", DECISION_RECORD_AUTHORING),),
     ),
 )

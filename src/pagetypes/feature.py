@@ -6,6 +6,14 @@ on their own, and reading one without the others would hide the coupling.
 
 from __future__ import annotations
 
+from ._stage_guidance import (
+    BUILDING,
+    FEATURE_BRIEF_REVIEW,
+    GROUNDING,
+    PLANNING,
+    PLAN_REVIEW,
+    SPEC,
+)
 from . import (
     AutoChildSpec,
     ChildStateGuard,
@@ -248,148 +256,12 @@ _FEATURE_BRIEF = PageType(
                 "shipped", "abandoned"),
         terminal_states=("shipped", "abandoned"),
         state_guidance=(
-            ("grounding", """
-                grounding - the summary is written and nothing else is known yet. This state is for
-                reading the real repository and recording what is actually there. The work of it:
-
-                - Find the code this feature touches and read it: the function, the file, the
-                  callers. Understand why it exists, not just what it does. A component whose
-                  purpose you cannot state is one you are not ready to plan against.
-                - Record only what you confirmed by opening it. Every component, constraint,
-                  conflict and stale doc here is read out of this repository, never inferred from a
-                  name or remembered from somewhere else.
-                - Follow callers and imports outward until the blast radius stops growing, and note
-                  as you go which components hold pure logic and which perform effects.
-                - Turn whatever reading could not settle into a question rather than an assumption.
-                  An unsurfaced assumption is the most expensive thing to carry out of this state.
-
-                No code is edited here and no design is started. If the summary turns out to be
-                wrong or underspecified once you can see the code, say so now, while nothing has
-                been built on it.
-            """),
-            ("spec", """
-                spec - the grounded base is recorded, and the design is settled once, in the
-                feature-spec child, before a single step or case exists. The work of it:
-
-                - Update the summary and update the page title to the correct understanding of the
-                  work and escalate any design questions early to the user now.
-                - Author the spec from the grounded base: the behaviour, the interfaces with their
-                  exact signatures, the data shapes, the states, the error paths. Decide everything
-                  a plan would otherwise have to decide for itself.
-                - Draw the line between pure logic and effects while designing rather than after.
-                  Decide what is a function of its inputs alone and what needs I/O, storage, the
-                  clock or randomness, and give each side its own interfaces. The rules live on the
-                  pure side; the effectful side stays thin enough to hold none of its own.
-                - Spec the smallest thing that delivers the summary. No configurability, extension
-                  points or generality nobody asked for, and no abstraction over a single use.
-                - Answer the brief's questions and record each decision with the alternatives it
-                  rejected and why, so a settled question is not reopened mid-build.
-                - Escalate what only a person can settle instead of settling it on their behalf.
-
-                Seal the spec once it is settled; sealing is what unlocks planning. Steps and cases
-                are not written here, because a design still moving is not one to plan against.
-            """),
-            ("planning", """
-                planning - the spec is sealed and is now turned into an implementation plan and a
-                testing plan detailed enough to build from without deciding anything further. The
-                work of it:
-
-                - Write each step as one action a skilled stranger to this codebase could finish in
-                  a few minutes, naming the exact files and carrying the real content it needs.
-                  Steps are read out of order and alone, so repeat detail rather than refer back.
-                - Give every step its verification: what will be run, and what it should print or
-                  return. A step with no way to tell whether it worked is not yet a step.
-                - Order the work so the pure logic is built and tested before the effectful code
-                  that calls it, and keep a step on one side of that line: a step that adds a rule
-                  changes pure logic, a step that wires it to storage or the network changes the
-                  shell around it.
-                - Plan the failure paths the spec implies alongside the happy one - empty inputs,
-                  missing values, malformed data, boundaries - and say what the volume this will
-                  really see does to the approach.
-                - Ask rather than guess. A question is cheap here and expensive once a plan exists.
-                  Record and escalate questions to the user now.
-
-                Keep both plans to what the spec asks for and nothing besides. Mark each ready when
-                it is complete; submitting the plan needs both plans ready and the spec still
-                sealed.
-            """),
-            ("planReview", """
-                plan-review - the plan is written, and this is the last point at which fixing it is
-                still cheap. This state is for reading the plan against the spec, not for building.
-                The work of it:
-
-                - Check every spec requirement against a step that delivers it, and every step
-                  against a spec requirement that asked for it. A requirement no step covers and a
-                  step nothing asked for are both findings.
-                - Check that the testing plan can actually fail: cases that assert real behaviour,
-                  that cover the spec's error paths, and that reach the pure logic directly instead
-                  of through a mock.
-                - Check that the plan is not larger than the problem, and that the pure and
-                  effectful sides stayed separate in it.
-                - Check that the steps do not update documentation as that is a later activity once
-                  the implementation has landed.
-                - Record each finding AND make the edit its action names, so the plan and this
-                  record agree. A finding recorded but never applied is worse than one never
-                  raised.
-
-                Set the verdict honestly: needs-changes when an implementer would build the wrong
-                thing or get stuck, needs-human-decision when a question has to go to a person.
-                Wording and style preferences are not grounds to withhold build-ready.
-            """),
-            ("building", """
-                building - the plan is approved, and this is where code is written. Work the steps
-                in their order and let the plan, not improvisation, decide what gets built. The work
-                of it:
-
-                - Work test-first: write the failing test, watch it fail, write the least code that
-                  passes it, watch it pass, commit. Mark a step done or a case passed only from a
-                  run you actually saw.
-                - Keep the pure logic pure. Decisions, derivations and transformations are functions
-                  of their arguments, with no I/O, no clock, no randomness and no reaching into
-                  shared mutable state, and the code that performs effects stays a thin shell that
-                  calls them and applies what they return. Where a step tangles the two, split them
-                  rather than reach for a mock.
-                - Name things for what they mean. A longer name that carries intent beats a short
-                  one that loses it, and an argument keeps its caller's name unless renaming
-                  genuinely clarifies. Comments say why, not what.
-                - Stay surgical. Touch only what the step needs; leave adjacent code, comments and
-                  formatting exactly as found, and match the style already there even where you
-                  would have chosen otherwise. Remove only the imports and helpers your own change
-                  orphaned, and raise anything else you notice as a conflict or a question instead
-                  of fixing it in passing.
-                - Handle the realistic failure cases the plan named, and flag a limitation you are
-                  knowingly leaving in rather than let it be discovered later.
-
-                Anything the plan did not anticipate is a question, or a reopened plan, not a quiet
-                improvisation. Record each commit as you make it.
-            """),
-            ("review", """
-                review - the build is done, and this is the last stop before the human ship gate.
-                This state is for verifying, not for finishing off. The work of it:
-
-                - Re-read the spec's design section and confirm every requirement it states is
-                  actually implemented, not merely planned.
-                - Confirm every implementation-plan step is done and every testing-plan case passed
-                  against a test that genuinely ran. A case marked passed without a run you saw is
-                  the one failure this gate exists to catch.
-                - Confirm nothing that worked before is broken now, and that the diff carries only
-                  what the plan called for: an unrelated change here is a change nobody reviewed.
-                - Confirm the pure logic stayed free of effects and the shell around it stayed free
-                  of rules.
-                - Review the comments added for the change. Avoid verbosity of comments and avoid
-                  naming the specifics of other parts of code and instead keep comments to general
-                  principles and intents. Comments should only refer to the current code, not the
-                  previous implementation. Uppercase words and emphasis markers are inappropriate in
-                  tone and single line comments that are self-evident by code should be removed.
-
-                Three things are deliberately not part of this state, so do not start them here:
-                rebasing onto main happens at ship, not before; recording commits happens after ship,
-                once the shas are final; and reconciling the documentation pages the brief named as
-                going stale also happens at ship.
-
-                If any of this turns up outstanding work, use requestChanges to go back to building
-                rather than ship with a known gap.
-            """),
+            ("grounding", GROUNDING),
+            ("spec", SPEC),
+            ("planning", PLANNING),
+            ("planReview", PLAN_REVIEW),
+            ("building", BUILDING),
+            ("review", FEATURE_BRIEF_REVIEW),
         ),
     ),
     # On createPage, create the three pinned children in the same commit; author into those.

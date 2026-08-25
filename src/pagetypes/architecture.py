@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ._stage_guidance import ARCHITECTURE_AUTHORING
 from . import (
     FSMSpec,
     PageType,
@@ -138,28 +139,6 @@ _ARCHITECTURE = PageType(
         initial="authoring",
         states=("authoring", "current"),
         terminal_states=("current",),
-        state_guidance=(("authoring", """
-            authoring - documents a part of the system that already exists, written by reading
-            that code rather than recalling it. The work of it:
-
-            - Fix the boundary first: one part, one granularity, a job stated in one line. If
-              that line needs an "and", it is two nodes.
-            - Describe what is there today. Aspirational architecture belongs in a feature
-              brief, and a page mixing the two describes neither.
-            - Write what one file cannot show: why it exists, where its boundary runs, what
-              crosses it, what must stay true. Point at a symbol rather than copy it.
-            - Say which side of the pure/effectful line the node sits on, and where that line
-              runs inside it. A reader deciding where new behaviour belongs needs that first.
-            - Write invariants that can be checked and broken, with what breaks when violated.
-              "Stays consistent" is not one.
-            - Record dependencies in the direction this node experiences them, naming what
-              crosses the boundary.
-            - Confirm each code reference by opening it, then record the commit you read at.
-
-            Why it is shaped this way belongs in a decision record, linked from here. Keep the
-            page at the scale of its siblings, and when the code moves on mark it stale rather
-            than leave it describing an older system - a stale page is locked until markCurrent
-            brings it back here.
-            """),),
+        state_guidance=(("authoring", ARCHITECTURE_AUTHORING),),
     ),
 )
