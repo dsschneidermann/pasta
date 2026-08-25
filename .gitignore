@@ -13,6 +13,7 @@ __pycache__/
 # Claude worktrees and settings
 .claude/worktrees
 .claude/settings.local.json
+.mcp.json
 
 # Sphinx build output
 docsite/_build/html/**
