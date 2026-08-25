@@ -2,7 +2,7 @@
 
 from src.commands import apply_command, create_page
 from src.model import Page
-from src.pagetypes import FSMSpec, PageType, get_page_type
+from src.pagetypes import LIST, SCALAR, FieldSpec, FSMSpec, PageType, get_page_type
 from src.render import RefContext
 from src.render_html import (_children_html, _field_html, _list_html, _references_html,
                              _text_html, element_view, render_page_html)
@@ -130,6 +130,48 @@ def test_scalar_field_keeps_its_label_when_empty():
     empty = _field_html(spec, None, None)
     assert "<dt>label</dt><dd>alpha</dd>" in filled
     assert "<dt>label</dt>" in empty and 'class="empty"' in empty and "None." in empty
+
+
+def test_scalar_url_field_renders_a_clickable_link():
+    spec = FieldSpec(key="url", kind=SCALAR)
+    out = _field_html(spec, "https://example.com/pr/1", None)
+    assert ('<dt>url</dt><dd><a href="https://example.com/pr/1" target="_blank" '
+            'rel="noopener noreferrer">https://example.com/pr/1</a></dd>') in out
+
+
+def test_empty_scalar_url_field_keeps_the_none_fallback():
+    spec = FieldSpec(key="url", kind=SCALAR)
+    out = _field_html(spec, "", None)
+    assert "<dt>url</dt>" in out and 'class="empty"' in out and "None." in out
+    assert "<a " not in out
+
+
+def test_scalar_url_value_is_escaped_in_both_the_href_and_the_text():
+    spec = FieldSpec(key="url", kind=SCALAR)
+    out = _field_html(spec, 'https://x/?a=1&b=2"><script>', None)
+    assert "&amp;" in out and "&quot;" in out and "&lt;script&gt;" in out
+    assert "<script>" not in out
+
+
+def test_a_scalar_field_not_named_url_stays_plain_text():
+    spec = FieldSpec(key="label", kind=SCALAR)
+    out = _field_html(spec, "https://example.com", None)
+    assert "<dt>label</dt><dd>https://example.com</dd>" in out
+    assert "<a " not in out
+
+
+def test_element_row_named_url_renders_a_clickable_link():
+    spec = FieldSpec(key="commits", kind=LIST, element_fields=("sha", "url"))
+    out = _list_html(spec, [{"id": "e1", "sha": "abc123", "url": "https://example.com/c/abc"}], None)
+    assert ('<dt>url</dt><dd><p><a href="https://example.com/c/abc" target="_blank" '
+            'rel="noopener noreferrer">https://example.com/c/abc</a></p></dd>') in out
+    assert "<dt>sha</dt><dd><p>abc123</p></dd>" in out       # a non-url row stays plain text
+
+
+def test_element_row_named_url_still_resolves_a_page_id_to_a_titled_link():
+    spec = FieldSpec(key="commits", kind=LIST, element_fields=("sha", "url"))
+    out = _list_html(spec, [{"id": "e1", "sha": "abc", "url": "a:1"}], _context())
+    assert '<a href="/ws:demo/page/a:1">Alpha</a>' in out       # page-id resolution preserved
 
 
 def test_prose_field_renders_paragraphs_and_an_empty_fallback():

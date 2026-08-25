@@ -46,6 +46,14 @@ def _text_html(text: str) -> str:
     return "".join(paragraphs)
 
 
+def _url_link(value: str) -> str:
+    """A field named `url` as a clickable link that opens in a new tab. The value is escaped for
+    both the href and the visible text, so an author-provided leaf stays safe to place directly in
+    the emitted HTML; the new tab carries no opener reference back to this page."""
+    escaped = _escape(value)
+    return f'<a href="{escaped}" target="_blank" rel="noopener noreferrer">{escaped}</a>'
+
+
 @dataclass(frozen=True)
 class ElementView:
     """One list element decomposed for display, before any HTML exists.
@@ -135,7 +143,7 @@ def _element_html(view: ElementView, ref_context: RefContext | None) -> str:
         if value is None:
             cell = '<dd class="empty">&mdash;</dd>'
         else:
-            linked = _page_link(value, ref_context)
+            linked = _page_link(value, ref_context) or (_url_link(value) if label == "url" else None)
             cell = f"<dd><p>{linked}</p></dd>" if linked else f"<dd>{_text_html(value)}</dd>"
         cells.append(f"<dt>{_escape(label)}</dt>" + cell)
     for label, blocks in view.block_rows:
@@ -163,8 +171,12 @@ def _field_html(field_spec: FieldSpec, value: Any, ref_context: RefContext | Non
     """One field as HTML, or the empty fallback when it holds no content. A scalar keeps its
     label either way, so the field stays named even when unset."""
     if field_spec.kind == SCALAR:
-        shown = (f"<dd>{_escape(value)}</dd>" if value not in (None, "")
-                 else '<dd class="empty">None.</dd>')
+        if value in (None, ""):
+            shown = '<dd class="empty">None.</dd>'
+        elif field_spec.key == "url":
+            shown = f"<dd>{_url_link(str(value))}</dd>"
+        else:
+            shown = f"<dd>{_escape(value)}</dd>"
         return f'<dl class="field-rows"><dt>{_escape(field_spec.key)}</dt>{shown}</dl>'
     if field_spec.kind == PROSE:
         return _text_html(str(value)) if value else _NONE_HTML
