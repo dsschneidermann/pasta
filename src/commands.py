@@ -280,6 +280,10 @@ def apply_command(
     _check_legal(page, page_type, command)
 
     working = page.copy()
+    # Backfill any section/field the page type declares now but this page predates - e.g. a
+    # section added to the page type after this page was created - so the command below can
+    # write into it instead of finding it missing.
+    working.sections = initial_sections(page_type, working.sections)
     created_id, created_ids = _apply(working, page_type, command, args, id_factory, batch_context)
     return CommandResult(page=working, created_id=created_id, created_ids=created_ids)
 

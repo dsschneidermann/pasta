@@ -70,6 +70,16 @@ def test_create_page_rejects_blank_title():
         _ = create_page(FIELDS, "   ", None, make_counter())
 
 
+def test_apply_command_backfills_a_section_missing_from_the_stored_page():
+    # Simulates a page type gaining a new section/field after some of its pages already exist:
+    # the stored page predates "items" and must not raise when a command targets it.
+    page = create_page(FIELDS, "A fixture", None, make_counter())
+    del page.sections["items"]
+    result = apply_command(page, FIELDS, "addItem", {"text": "hi"}, make_counter())
+    assert [item["text"] for item in result.page.sections["items"]["items"]] == ["hi"]
+    assert result.created_id is not None
+
+
 def test_add_link_appends_edge_and_is_always_legal():
     # addLink is on every authorable type and always legal; the pure core appends the edge
     # to Page.links (cross-page validation - existence, dedup - is the store's job).

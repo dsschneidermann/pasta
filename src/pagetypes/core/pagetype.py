@@ -129,12 +129,22 @@ def status_transitions(page_type: PageType) -> tuple[tuple[str, str, str, str], 
     return tuple(edges)
 
 
-def initial_sections(page_type: PageType) -> dict[str, dict[str, Any]]:
-    """The empty section/field state a freshly created page of this type starts with."""
+def initial_sections(
+    page_type: PageType, existing: dict[str, dict[str, Any]] | None = None
+) -> dict[str, dict[str, Any]]:
+    """The section/field state a page of this type starts with, or `existing` backfilled onto it.
+
+    Idempotent: a section or field already present in `existing` is carried over untouched: only
+    a section or field the page type declares but `existing` lacks gets its empty default. This
+    lets the same function seed a freshly created page (no `existing`) and backfill an older page
+    against a page type that has since gained a section or field.
+    """
     sections: dict[str, dict[str, Any]] = {}
     for section in page_type.sections:
-        field_values: dict[str, Any] = {}
+        field_values: dict[str, Any] = dict((existing or {}).get(section.key, {}))
         for field_spec in section.fields:
+            if field_spec.key in field_values:
+                continue
             if field_spec.kind == PROSE:
                 field_values[field_spec.key] = ""
             elif field_spec.kind in (LIST, BLOCKS):
