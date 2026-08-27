@@ -878,11 +878,11 @@ class Store:
             for entry in args.get(arg.name) or []:
                 if not isinstance(entry, dict):
                     continue                  # left for the grammar validation to reject
-                spec = next((kind for kind in arg.block_kinds
-                             if kind.kind == entry.get("kind")), None)
-                if spec is not None and spec.ref_check is not None:
-                    Store._resolve_ref(workspace, page, spec.ref_check,
-                                       entry.get(spec.ref_check.arg), command.name)
+                block = next((block for block in arg.block_kinds
+                              if block.kind == entry.get("kind")), None)
+                if block is not None and block.ref_check is not None:
+                    Store._resolve_ref(workspace, page, block.ref_check,
+                                       entry.get(block.ref_check.arg), command.name)
 
     @staticmethod
     def _check_inline_refs(workspace: Workspace, command: CommandSpec, args: dict[str, Any]) -> None:

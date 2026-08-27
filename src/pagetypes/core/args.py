@@ -2,7 +2,7 @@
 vocabulary built out of them.
 
 The two belong together: the block-kind helpers build a BlockKindSpec out of the same arg
-helpers a command's arg list uses, and standard_block_kinds() collects the standard kinds.
+helpers a command's arg list uses, and standard_blocks() collects the standard kinds.
 """
 
 from __future__ import annotations
@@ -108,30 +108,30 @@ class BlockKindSpec:
         return self.args
 
 
-def _reject_duplicate_kinds(where: str, kinds: tuple[BlockKindSpec, ...]) -> None:
+def _reject_duplicate_blocks(where: str, block_kinds: tuple[BlockKindSpec, ...]) -> None:
     """A field naming one kind twice is a declaration bug - the second is unreachable."""
     seen: set[str] = set()
-    for spec in kinds:
-        if spec.kind in seen:
-            raise ValueError(f"{where}: block kinds name '{spec.kind}' twice.")
-        seen.add(spec.kind)
+    for block in block_kinds:
+        if block.kind in seen:
+            raise ValueError(f"{where}: block kinds name '{block.kind}' twice.")
+        seen.add(block.kind)
 
 
 @dataclass(frozen=True)
 class ElementBlocksSpec:
     """A LIST element field that holds an ordered array of blocks instead of a scalar value.
 
-    `kinds` is the closed vocabulary the field accepts - the same BlockKindSpec tuple a
+    `block_kinds` is the closed vocabulary the field accepts - the same BlockKindSpec tuple a
     page-level blocks field declares, which is what makes the two levels one mechanism.
     """
     field: str
-    kinds: tuple[BlockKindSpec, ...]
+    block_kinds: tuple[BlockKindSpec, ...]
 
     def __post_init__(self):
-        if not self.kinds:
+        if not self.block_kinds:
             raise ValueError(
                 f"{self.field}: a block-bearing element field declares no block kinds.")
-        _reject_duplicate_kinds(self.field, self.kinds)
+        _reject_duplicate_blocks(self.field, self.block_kinds)
 
 
 # --- Arg helpers -------------------------------------------------------------
@@ -213,7 +213,7 @@ _PRECEDING = _text("precedingId", required=False,
 # Factories that build a BlockKindSpec the way _text builds an ArgSpec, so a field's vocabulary
 # reads as `(_paragraph_runs(), _code_block())` rather than spelling out each spec's body args.
 # One per standard kind, two text-only variants whose body is a single plain `text` arg, and
-# `standard_block_kinds()` for the whole vocabulary.
+# `standard_blocks()` for the whole vocabulary.
 def _paragraph_runs() -> BlockKindSpec:
     return BlockKindSpec("paragraph", args=(_array("inlines", content=INLINE_RUNS),))
 
@@ -254,6 +254,6 @@ def _heading_text() -> BlockKindSpec:
     return BlockKindSpec("heading", args=(_integer("level"), _text()))
 
 
-def standard_block_kinds() -> tuple[BlockKindSpec, ...]:
+def standard_blocks() -> tuple[BlockKindSpec, ...]:
     """Every standard kind, in the canonical order - what a field passes to accept them all."""
     return (_paragraph_runs(), _heading_runs(), _code_block(), _list_block(), _quote_block(), _table_block(), _divider_block())

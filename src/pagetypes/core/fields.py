@@ -9,7 +9,7 @@ from textwrap import dedent
 from .args import (
     BlockKindSpec,
     ElementBlocksSpec,
-    _reject_duplicate_kinds,
+    _reject_duplicate_blocks,
 )
 from .specs import BLOCKS, LIST, PROSE, SCALAR, TITLE_ELEMENT_FIELDS, ElementFSMSpec
 
@@ -36,33 +36,33 @@ class FieldSpec:
             raise ValueError(f"{self.key}: block_kinds is only valid on a blocks field.")
         if self.kind == BLOCKS and not self.block_kinds:
             raise ValueError(f"{self.key}: a blocks field declares no block kinds.")
-        _reject_duplicate_kinds(self.key, self.block_kinds)
+        _reject_duplicate_blocks(self.key, self.block_kinds)
         # A block-bearing element field is checked where it is declared, so a typo fails at import
         # rather than producing a field nothing can ever author.
         seen: set[str] = set()
-        for spec in self.element_blocks:
+        for blocks in self.element_blocks:
             if self.kind != LIST:
                 raise ValueError(f"{self.key}: element_blocks is only valid on a list field.")
-            if spec.field not in (self.element_fields or ()):
+            if blocks.field not in (self.element_fields or ()):
                 raise ValueError(
-                    f"{self.key}: element_blocks names '{spec.field}', which is not one of " +
+                    f"{self.key}: element_blocks names '{blocks.field}', which is not one of " +
                     f"element_fields."
                 )
-            if spec.field in seen:
-                raise ValueError(f"{self.key}: element_blocks names '{spec.field}' twice.")
-            seen.add(spec.field)
+            if blocks.field in seen:
+                raise ValueError(f"{self.key}: element_blocks names '{blocks.field}' twice.")
+            seen.add(blocks.field)
 
     def element_blocks_spec(self, element_field: str) -> ElementBlocksSpec | None:
         """The block declaration for `element_field`, or None when it holds a scalar value."""
-        for spec in self.element_blocks:
-            if spec.field == element_field:
-                return spec
+        for blocks in self.element_blocks:
+            if blocks.field == element_field:
+                return blocks
         return None
 
     def block_element_fields(self) -> tuple[str, ...]:
         """The element field names that hold blocks - what every consumer skips when it is
         treating an element's fields as scalar text."""
-        return tuple(spec.field for spec in self.element_blocks)
+        return tuple(blocks.field for blocks in self.element_blocks)
 
     def title_element_field(self) -> str | None:
         """The element field whose value heads each of this list's elements, or None when the

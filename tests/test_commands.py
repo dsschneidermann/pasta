@@ -32,7 +32,7 @@ from src.pagetypes import (
     list_cmds,
     set_prose_cmd,
     set_title_cmd,
-    standard_block_kinds,
+    standard_blocks,
     transition_cmd,
 )
 
@@ -662,7 +662,7 @@ def test_is_field_setter_classifies_by_kind():
 # An ad-hoc, unregistered draft->sealed type: markSealed requires overview (prose) AND design (blocks),
 # both authored in `draft`. Built directly (not via the store/registry) to exercise the pure edge logic -
 # blocks grouping, legal_in gating, and stage-scoping - which no production-mirroring fixture covers.
-_DESIGN_BODY = _blocks("body", block_kinds=standard_block_kinds(), description="the design instruction")
+_DESIGN_BODY = _blocks("body", block_kinds=standard_blocks(), description="the design instruction")
 
 
 def _field_setter_page_type() -> PageType:
@@ -790,7 +790,7 @@ def items_of(page):
 
 def _unified_blocks_page_type() -> PageType:
     """An ad-hoc type whose body field carries the unified four-command block surface."""
-    body = _blocks("body", block_kinds=standard_block_kinds(), description="a rich-text blocks body")
+    body = _blocks("body", block_kinds=standard_blocks(), description="a rich-text blocks body")
     return PageType(
         tag="xtest-unified-blocks", name="Unified blocks fixture",
         description="ad-hoc fixture: one blocks field, one add and one set",

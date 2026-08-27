@@ -409,7 +409,7 @@ def _apply(
     raise ValidationError(f"Unsupported command kind '{command.kind}'.")
 
 
-def _create_blocks(entries: list[dict[str, Any]], kinds: tuple[BlockKindSpec, ...],
+def _create_blocks(entries: list[dict[str, Any]], block_kinds: tuple[BlockKindSpec, ...],
                  id_factory: IdFactory) -> list[dict[str, Any]]:
     """Id'd blocks from validated argument entries - the one place a block is built.
 
@@ -419,9 +419,9 @@ def _create_blocks(entries: list[dict[str, Any]], kinds: tuple[BlockKindSpec, ..
     """
     made: list[dict[str, Any]] = []
     for entry in entries:
-        spec = next(kind for kind in kinds if kind.kind == entry["kind"])
-        block: dict[str, Any] = {"id": id_factory(""), "kind": spec.kind}
-        for body in spec.body_args():
+        block_kind = next(block for block in block_kinds if block.kind == entry["kind"])
+        block: dict[str, Any] = {"id": id_factory(""), "kind": block_kind.kind}
+        for body in block_kind.body_args():
             block[body.name] = entry.get(body.name)
         made.append(block)
     return made
@@ -431,8 +431,11 @@ def _element_blocks_from_args(field_spec: FieldSpec, args: dict[str, Any],
                               id_factory: IdFactory) -> dict[str, list[dict[str, Any]]]:
     """The id'd block arrays for an element being created: one per declared block field, read from
     the same-named optional argument. A field with no argument starts empty."""
-    return {spec.field: _create_blocks(args.get(spec.field) or [], spec.kinds, id_factory)
-            for spec in field_spec.element_blocks}
+    return {
+        element_blocks.field: _create_blocks(
+            args.get(element_blocks.field) or [], element_blocks.block_kinds, id_factory)
+        for element_blocks in field_spec.element_blocks
+    }
 
 
 def _add_element(page: Page, page_type: PageType, command: CommandSpec,

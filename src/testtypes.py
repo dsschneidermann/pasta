@@ -87,7 +87,7 @@ from .pagetypes import (
     transition_on_add_cmd,
     add_link_cmd,
     set_title_cmd,
-    standard_block_kinds,
+    standard_blocks,
 )
 
 
@@ -160,7 +160,7 @@ TEST_BLOCKS = PageType(
     description="Test fixture: the blocks field - every block kind and the inline-run grammar.",
     sections=(
         SectionSpec("body", "Body", (
-            _blocks("body", standard_block_kinds(), "a rich-text blocks body"),)),
+            _blocks("body", standard_blocks(), "a rich-text blocks body"),)),
     ),
     # The field is passed to both its section and its factory, so its vocabulary - here the
     # default, every standard kind - is declared once.
