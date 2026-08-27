@@ -109,8 +109,8 @@ def validate_block(entry: Any, kinds: tuple[BlockKindSpec, ...]) -> None:
     A block is an object carrying a `kind` the field declares plus exactly that kind's body args,
     each checked the way the per-kind command used to check it - so a block that is legal to
     create is legal to set, and the reverse. Both paths share this grammar rather than restating
-    it. The body args come from the matched BlockKindSpec, never from the global BLOCK_ARGS,
-    which is what makes a per-field override real.
+    it. The body args come from the matched BlockKindSpec, which the kind carries directly, so a
+    per-field override is honoured.
     """
     if not isinstance(entry, dict):
         raise ValidationError(
@@ -156,8 +156,7 @@ def collect_ref_ids(content: str, value: Any,
 
     `kinds` is the vocabulary of a BLOCK_ARRAY arg. Without it there is no way to know which of a
     block's keys hold runs, so that shape yields nothing rather than guessing - and reading the
-    body args off the vocabulary rather than BLOCK_ARGS is what keeps an overridden kind's runs
-    reachable.
+    body args off the vocabulary is what keeps an overridden kind's runs reachable.
     """
     ids: list[str] = []
 

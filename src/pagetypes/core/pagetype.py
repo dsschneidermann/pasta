@@ -86,14 +86,14 @@ class PageType:
                 raise ValueError(
                     f"{self.tag}: command '{command.name}' carries blocks for "
                     f"{command.section}.{command.field}, which is not a blocks field.")
-            return replace(arg, block_kinds=field_spec.block_vocabulary())
+            return replace(arg, block_kinds=field_spec.block_kinds)
         spec = field_spec.element_blocks_spec(element_field)
         if spec is None:
             raise ValueError(
                 f"{self.tag}: command '{command.name}' carries blocks for "
                 f"{command.section}.{command.field}.{element_field}, which is not declared "
                 f"as a block-bearing element field.")
-        return replace(arg, block_kinds=spec.vocabulary())
+        return replace(arg, block_kinds=spec.kinds)
 
 
 

@@ -5,13 +5,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import cast
 
 from .args import (
-    STANDARD_BLOCK_KINDS,
     BlockKindSpec,
     ElementBlocksSpec,
-    _as_block_kinds,
     _reject_duplicate_kinds,
 )
 from .specs import BLOCKS, LIST, PROSE, SCALAR, TITLE_ELEMENT_FIELDS, ElementFSMSpec
@@ -26,8 +23,7 @@ class FieldSpec:
     element_fsm: ElementFSMSpec | None = None   # for LIST: a per-element lifecycle (todo/done, ...)
     # for LIST: element fields that hold blocks rather than a scalar value
     element_blocks: tuple[ElementBlocksSpec, ...] = ()
-    # for a blocks field: the kinds it accepts. () means every standard kind.
-    block_kinds: tuple[BlockKindSpec | str, ...] = ()
+    block_kinds: tuple[BlockKindSpec, ...] = ()
     description: str = ""
 
     def __post_init__(self):
@@ -36,11 +32,11 @@ class FieldSpec:
         # breaks are kept - markdown reflows a paragraph's newlines away.
         object.__setattr__(self, "description", dedent(self.description.strip("\n")).rstrip())
         # Checked where it is declared, so a typo fails at import rather than at authoring time.
-        normalized_kinds = _as_block_kinds(self.block_kinds)
-        if normalized_kinds and self.kind != BLOCKS:
+        if self.block_kinds and self.kind != BLOCKS:
             raise ValueError(f"{self.key}: block_kinds is only valid on a blocks field.")
-        _reject_duplicate_kinds(self.key, normalized_kinds)
-        object.__setattr__(self, "block_kinds", normalized_kinds)
+        if self.kind == BLOCKS and not self.block_kinds:
+            raise ValueError(f"{self.key}: a blocks field declares no block kinds.")
+        _reject_duplicate_kinds(self.key, self.block_kinds)
         # A block-bearing element field is checked where it is declared, so a typo fails at import
         # rather than producing a field nothing can ever author.
         seen: set[str] = set()
@@ -55,14 +51,6 @@ class FieldSpec:
             if spec.field in seen:
                 raise ValueError(f"{self.key}: element_blocks names '{spec.field}' twice.")
             seen.add(spec.field)
-
-    def block_vocabulary(self) -> tuple[BlockKindSpec, ...]:
-        """The kinds this blocks field accepts - its declaration, else every standard kind.
-
-        The one accessor every consumer reads. Nothing downstream may fall back to the global
-        BLOCK_ARGS, or a per-field body-arg override would silently stop being honoured.
-        """
-        return cast(tuple[BlockKindSpec, ...], self.block_kinds) or STANDARD_BLOCK_KINDS
 
     def element_blocks_spec(self, element_field: str) -> ElementBlocksSpec | None:
         """The block declaration for `element_field`, or None when it holds a scalar value."""
@@ -112,6 +100,6 @@ def _list(key: str, element_fields: tuple[str, ...], element_fsm: ElementFSMSpec
                      description=description)
 
 
-def _blocks(key: str, *, block_kinds: tuple[BlockKindSpec | str, ...] = (),
+def _blocks(key: str, block_kinds: tuple[BlockKindSpec, ...],
             description: str = "") -> FieldSpec:
     return FieldSpec(key=key, kind=BLOCKS, block_kinds=block_kinds, description=description)

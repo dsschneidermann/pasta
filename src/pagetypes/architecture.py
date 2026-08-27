@@ -8,7 +8,9 @@ from . import (
     PageType,
     SectionSpec,
     _blocks,
+    _code_block,
     _list,
+    _paragraph_runs,
     _prose,
     _scalar,
     _text,
@@ -70,7 +72,7 @@ _ARCHITECTURE = PageType(
                 """)
         ,)),
         SectionSpec("details", "Details", (
-            _blocks("body", block_kinds=("paragraph", "code"), description="""
+            _blocks("body", block_kinds=(_paragraph_runs(), _code_block()), description="""
                 Design notes that do not fit the fixed sections: rationale, trade-offs that were
                 considered and rejected, gotchas, and worked examples. Use a code block for anything a
                 reader would otherwise have to reconstruct from prose. Emphasis and links are

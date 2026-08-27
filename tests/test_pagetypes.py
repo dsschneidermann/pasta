@@ -33,13 +33,11 @@ from src.pagetypes import (
     TABLE_ALIGN,
     TRANSITION,
     BLOCKS,
-    BLOCK_ARGS,
     BLOCK_ARRAY,
     LIST,
     PROSE,
     REGISTRY,
     BlockKindSpec,
-    STANDARD_BLOCK_KINDS,
     ElementBlocksSpec,
     set_prose_cmd,
     SectionSpec,
@@ -48,9 +46,21 @@ from src.pagetypes import (
     FieldSpec,
     _array,
     _blocks,
+    _boolean,
+    _code_block,
+    _divider_block,
+    _heading_runs,
+    _integer,
     _list,
+    _list_block,
+    _paragraph_runs,
     _prose,
+    _quote_block,
+    _table_block,
     _text,
+    _heading_text,
+    _paragraph_text,
+    standard_block_kinds,
     blocks_cmds,
     collect_ref_ids,
     element_blocks_cmds,
@@ -68,9 +78,15 @@ from src.pagetypes import (
 from src.pagetypes import _stage_guidance
 from src.testtypes import TEST_REGISTRY
 
+_STANDARD_BLOCK_HELPERS = {
+    "paragraph": _paragraph_runs, "heading": _heading_runs, "code": _code_block, "list": _list_block,
+    "quote": _quote_block, "table": _table_block, "divider": _divider_block,
+}
+
+
 def _kinds(*names: str) -> tuple[BlockKindSpec, ...]:
-    """A field vocabulary from bare kind names - the same normalization a declaration does."""
-    return tuple(BlockKindSpec(name) for name in names)
+    """A field vocabulary from bare kind names - resolves each to its standard-kind helper."""
+    return tuple(_STANDARD_BLOCK_HELPERS[name]() for name in names)
 
 
 # Structural invariants must hold for EVERY page type - production and hand-authored fixture alike.
@@ -200,7 +216,7 @@ def test_block_commands_target_blocks_fields(tag: str):
         )
         # The kind is data in the argument now, so what a command may write is the vocabulary
         # its block argument carries - which must be exactly the element field's declaration.
-        accepted = [kind.kind for kind in blocks_spec.vocabulary()]
+        accepted = [kind.kind for kind in blocks_spec.kinds]
         for arg in command.args:
             if arg.block_kinds is None:
                 continue
@@ -386,7 +402,7 @@ def test_blocks_body_is_an_inline_run_blocks_field():
     assert field.kind == BLOCKS
     add = BLK.command("addBody")
     assert add.kind == ADD_BLOCK and add.args[0].content == BLOCK_ARRAY
-    paragraph = next(kind for kind in field.block_vocabulary() if kind.kind == "paragraph")
+    paragraph = next(kind for kind in field.block_kinds if kind.kind == "paragraph")
     assert paragraph.body_args()[0].content == INLINE_RUNS
 
 
@@ -513,49 +529,93 @@ def test_every_production_guidance_text_comes_from_the_stage_guidance_module():
 
 # --- A block kind's declared vocabulary ---------------------------------------
 def test_block_kind_spec_resolves_body_args():
-    # A standard kind takes its body from the shared table; an override replaces that body
-    # outright, which is what lets one kind name mean different things in different fields.
-    assert BlockKindSpec("code").body_args() == BLOCK_ARGS["code"]
+    # A kind carries its own body args; the same kind name can mean a different body in a different
+    # field, which is what a per-field override is.
+    assert _code_block().body_args() == (_text("language"), _text("source"))
     override = BlockKindSpec("paragraph", args=(_text(),))
     assert override.body_args() == (_text(),)
-    assert override.body_args() != BLOCK_ARGS["paragraph"]
+    assert override.body_args() != _paragraph_runs().body_args()
 
 
 def test_block_kind_spec_rejects_a_bad_declaration():
-    # A kind the shared table does not know has no body to fall back on, so it must declare one -
-    # and declaring one is exactly how a custom kind like `decision` is defined.
-    with pytest.raises(ValueError, match="not a standard kind"):
-        BlockKindSpec("decision")
+    # Every kind declares its own args - there is no shared table to fall back on - and a custom
+    # kind like `decision` is defined exactly by declaring them.
+    with pytest.raises(TypeError):
+        BlockKindSpec("decision")                        # args is required
     custom = BlockKindSpec("decision", args=(_text("questionId"), _text()))
     assert custom.body_args() == (_text("questionId"), _text())
     with pytest.raises(ValueError, match="non-empty name"):
-        BlockKindSpec("")
+        BlockKindSpec("", args=())
 
 
-def test_field_spec_block_vocabulary():
-    # An undeclared blocks field accepts every standard kind; a declared one accepts exactly
-    # what it names, in the order it names them.
-    assert _blocks("body").block_vocabulary() == STANDARD_BLOCK_KINDS
-    assert [kind.kind for kind in _blocks("body").block_vocabulary()] == [
+def test_block_kind_helpers():
+    # Each helper builds a BlockKindSpec with the exact standard body args, so it is a drop-in for
+    # the old per-kind table. Asserted against explicit expected args (not a lookup) so the test
+    # stands on its own once that table is gone.
+    assert _paragraph_runs().kind == "paragraph"
+    assert _paragraph_runs().body_args() == (_array("inlines", content=INLINE_RUNS),)
+    assert _heading_runs().body_args() == (_integer("level"), _array("inlines", content=INLINE_RUNS))
+    assert _code_block().body_args() == (_text("language"), _text("source"))
+    assert _list_block().kind == "list"
+    assert _list_block().body_args() == (_boolean("ordered"), _array("items", content=INLINE_RUN_LISTS))
+    assert _quote_block().body_args() == (_array("paragraphs", content=INLINE_RUN_LISTS),)
+    assert _table_block().body_args() == (_array("header", content=INLINE_RUN_LISTS),
+                                    _array("rows", content=INLINE_RUN_GRID),
+                                    _array("align", required=False, content=TABLE_ALIGN))
+    assert _divider_block().kind == "divider" and _divider_block().body_args() == ()
+    # The text-only variants: one plain `text` arg (no inline-run shape) in place of `inlines`.
+    assert _paragraph_text().body_args() == (_text(),)
+    assert _heading_text().body_args() == (_integer("level"), _text())
+    # standard_block_kinds() is the whole vocabulary, in the canonical order.
+    assert [kind.kind for kind in standard_block_kinds()] == [
         "paragraph", "heading", "code", "list", "quote", "table", "divider"]
-    restricted = _blocks("body", block_kinds=("code", "paragraph"))
-    assert [kind.kind for kind in restricted.block_vocabulary()] == ["code", "paragraph"]
+    assert [kind.body_args() for kind in standard_block_kinds()] == [
+        _paragraph_runs().body_args(), _heading_runs().body_args(), _code_block().body_args(),
+        _list_block().body_args(), _quote_block().body_args(), _table_block().body_args(), _divider_block().body_args()]
+
+
+def test_removed_block_names_are_gone_and_helpers_exported():
+    # The old table machinery is removed from the package, and the helpers that replace it are
+    # exported in its place - both the binding and the __all__ entry.
+    import src.pagetypes as pkg
+    for gone in ("BLOCK_ARGS", "STANDARD_BLOCK_KINDS", "_ALL_BLOCK_KINDS", "_as_block_kinds"):
+        assert not hasattr(pkg, gone)
+        assert gone not in pkg.__all__
+    for helper in ("_paragraph_runs", "_heading_runs", "_paragraph_text", "_heading_text",
+                   "_code_block", "_list_block", "_quote_block", "_table_block", "_divider_block",
+                   "standard_block_kinds"):
+        assert hasattr(pkg, helper)
+        assert helper in pkg.__all__
+
+
+def test_field_spec_block_kinds():
+    # A blocks field carries exactly the kinds it is declared with, in order. block_kinds is
+    # required - the caller passes standard_block_kinds() for the whole standard vocabulary.
+    every = _blocks("body", block_kinds=standard_block_kinds())
+    assert [kind.kind for kind in every.block_kinds] == [
+        "paragraph", "heading", "code", "list", "quote", "table", "divider"]
+    restricted = _blocks("body", block_kinds=(_code_block(), _paragraph_runs()))
+    assert [kind.kind for kind in restricted.block_kinds] == ["code", "paragraph"]
+    with pytest.raises(TypeError):
+        _blocks("body")                                  # block_kinds is required
 
 
 def test_field_spec_rejects_a_bad_block_vocabulary():
     with pytest.raises(ValueError, match="only valid on a blocks field"):
-        FieldSpec(key="body", kind=PROSE, block_kinds=("code",))
+        FieldSpec(key="body", kind=PROSE, block_kinds=(_code_block(),))
     with pytest.raises(ValueError, match="twice"):
-        _blocks("body", block_kinds=("code", "code"))
+        _blocks("body", block_kinds=(_code_block(), _code_block()))
+    with pytest.raises(ValueError, match="declares no block kinds"):
+        FieldSpec(key="body", kind=BLOCKS, block_kinds=())
 
 
 # --- Block-bearing element fields --------------------------------------------
 def test_element_blocks_spec_is_hashable():
     # FieldSpec is reachable from the FSMSpec that keys fsm._machine_class's lru_cache, so a
     # declaration that cannot be hashed would break every page type at once.
-    assert {ElementBlocksSpec("detail", ("code",))} == {ElementBlocksSpec("detail", ("code",))}
+    assert {ElementBlocksSpec("detail", (_code_block(),))} == {ElementBlocksSpec("detail", (_code_block(),))}
     field = FieldSpec(key="items", kind=LIST, element_fields=("text", "detail"),
-                      element_blocks=(ElementBlocksSpec("detail", ("code",)),))
+                      element_blocks=(ElementBlocksSpec("detail", (_code_block(),)),))
     assert len({field, field}) == 1
 
 
@@ -563,18 +623,14 @@ def test_element_blocks_rejects_a_bad_declaration():
     # Every defect fails where the type is declared, not when someone tries to author the field.
     with pytest.raises(ValueError, match="only valid on a list field"):
         FieldSpec(key="body", kind=PROSE,
-                  element_blocks=(ElementBlocksSpec("detail", ("code",)),))
+                  element_blocks=(ElementBlocksSpec("detail", (_code_block(),)),))
     with pytest.raises(ValueError, match="not one of element_fields"):
         FieldSpec(key="items", kind=LIST, element_fields=("text",),
-                  element_blocks=(ElementBlocksSpec("nope", ("code",)),))
+                  element_blocks=(ElementBlocksSpec("nope", (_code_block(),)),))
     with pytest.raises(ValueError, match="twice"):
         FieldSpec(key="items", kind=LIST, element_fields=("text", "detail"),
-                  element_blocks=(ElementBlocksSpec("detail", ("code",)),
-                                  ElementBlocksSpec("detail", ("paragraph",))))
-    # The unknown-kind check lives on BlockKindSpec now - the kind is what is malformed.
-    with pytest.raises(ValueError, match="not a standard kind"):
-        FieldSpec(key="items", kind=LIST, element_fields=("text", "detail"),
-                  element_blocks=(ElementBlocksSpec("detail", ("paragraph", "nope")),))
+                  element_blocks=(ElementBlocksSpec("detail", (_code_block(),)),
+                                  ElementBlocksSpec("detail", (_paragraph_runs(),))))
     # A field declared to hold blocks but accepting none could never be authored.
     with pytest.raises(ValueError, match="no block kinds"):
         FieldSpec(key="items", kind=LIST, element_fields=("text", "detail"),
@@ -583,11 +639,11 @@ def test_element_blocks_rejects_a_bad_declaration():
 
 def test_block_element_fields_names_the_declared_fields():
     field = _list("items", element_fields=("text", "snippet", "detail"),
-                  element_blocks=(ElementBlocksSpec("snippet", ("code",)),
-                                  ElementBlocksSpec("detail", ("paragraph",))))
+                  element_blocks=(ElementBlocksSpec("snippet", (_code_block(),)),
+                                  ElementBlocksSpec("detail", (_paragraph_runs(),))))
     assert field.block_element_fields() == ("snippet", "detail")     # declared order
     snippet = field.element_blocks_spec("snippet")
-    assert snippet is not None and [kind.kind for kind in snippet.vocabulary()] == ["code"]
+    assert snippet is not None and [kind.kind for kind in snippet.kinds] == ["code"]
     assert field.element_blocks_spec("text") is None                 # a scalar element field
     # A list declaring none reports an empty tuple - what keeps every consumer's scalar path intact.
     assert _list("items", element_fields=("text",)).block_element_fields() == ()
@@ -606,8 +662,8 @@ def test_validate_block_reads_a_per_field_arg_override():
     """The case the whole vocabulary design exists for: one kind name, two body shapes.
 
     A field declaring `paragraph` as a plain text arg accepts `text` and rejects the standard
-    `inlines`, and a field declaring the standard kind does the reverse. If any consumer fell
-    back to the global BLOCK_ARGS this would pass in one direction only.
+    `inlines`, and a field declaring the standard kind does the reverse. If any consumer read a
+    shared table instead of the kind's own args this would pass in one direction only.
     """
     plain = (BlockKindSpec("paragraph", args=(_text(),)),)
     validate_block({"kind": "paragraph", "text": "just prose"}, plain)
@@ -667,7 +723,7 @@ def test_collect_ref_ids_finds_a_ref_inside_a_block():
 
 
 def test_collect_ref_ids_reads_runs_off_an_overridden_kind():
-    """An override moves a kind's runs to a different arg, so reading BLOCK_ARGS would miss them."""
+    """An override moves a kind's runs to a different arg, so reading a shared table would miss them."""
     kinds = (BlockKindSpec("note", args=(_array("body", content=INLINE_RUNS),)),)
     assert collect_ref_ids(
         BLOCK_ARRAY, [{"kind": "note", "body": ["see ", {"ref": "a:1"}]}], kinds) == ["a:1"]
@@ -688,7 +744,7 @@ def _arg_names(command):
 
 def test_list_cmds_adds_an_optional_blocks_arg_per_declared_field():
     steps = _list("items", element_fields=("text", "detail"),
-                  element_blocks=(ElementBlocksSpec("detail", ("paragraph", "code")),))
+                  element_blocks=(ElementBlocksSpec("detail", (_paragraph_runs(), _code_block())),))
     add, _remove, _reorder = _resolved(
         "steps", "Steps", steps,
         list_cmds("steps", label="step", add_args=(_text(),), element_blocks=("detail",)))
@@ -718,7 +774,7 @@ def _resolved(section_key, title, field_spec, commands):
 def test_blocks_cmds_is_three_commands_named_from_the_label():
     """One add per blocks field, named by _setter_label - the section for a `body` field, the
     field key otherwise - beside the remove and reorder it already had."""
-    body = _blocks("body")
+    body = _blocks("body", block_kinds=standard_block_kinds())
     add, remove, reorder = _resolved("body", "Body", body, blocks_cmds("body"))
     assert (add.name, remove.name, reorder.name) == ("addBody", "removeBlock", "reorderBlock")
     assert _arg_names(add) == ("blocks", "index", "precedingId")
@@ -727,14 +783,14 @@ def test_blocks_cmds_is_three_commands_named_from_the_label():
     # The add's array carries the field's vocabulary, so the schema and the validator read the
     # same declaration.
     assert add.args[0].content == BLOCK_ARRAY
-    assert add.args[0].block_kinds == body.block_vocabulary()
+    assert add.args[0].block_kinds == body.block_kinds
     assert add.args[0].required
     # It writes no raw argument onto anything - it converts the array into id'd blocks.
     assert dict(add.element_map) == {}
 
 
 def test_blocks_cmds_label_and_name_overrides():
-    models = _blocks("models", block_kinds=("code",))
+    models = _blocks("models", block_kinds=(_code_block(),))
     add, remove, reorder = _resolved(
         "dataModels", "Data models", models,
         blocks_cmds("dataModels", field="models", label="dataModels",
@@ -750,7 +806,7 @@ def test_blocks_cmds_label_and_name_overrides():
 def test_element_blocks_cmds_leads_with_the_element_id():
     """The element noun leads and the declared field key follows, with no pluralizing."""
     steps = _list("items", element_fields=("detail", "status"),
-                  element_blocks=(ElementBlocksSpec("detail", ("paragraph", "code")),))
+                  element_blocks=(ElementBlocksSpec("detail", (_paragraph_runs(), _code_block())),))
     add, remove, reorder = _resolved(
         "steps", "Steps", steps, element_blocks_cmds("steps", "detail"))
     assert (add.name, remove.name, reorder.name) == (
@@ -771,7 +827,7 @@ def test_validate_block_and_validate_blocks_are_one_grammar():
     The add and the set are the two paths a block can arrive by; if they ever validated
     separately they could drift, and a block would be settable but not creatable.
     """
-    kinds = _kinds(*[spec.kind for spec in STANDARD_BLOCK_KINDS])
+    kinds = standard_block_kinds()
     samples = [
         {"kind": "paragraph", "inlines": ["ok"]},
         {"kind": "heading", "level": 2, "inlines": ["ok"]},
@@ -834,7 +890,7 @@ def test_block_command_names_match_the_declared_surface():
 def test_two_do_eligible_setters_for_one_field_are_rejected():
     """A `do` field edge names one command, so a second would be silently dropped rather than
     raise. This is what makes the singular key safe against a future page type."""
-    body = _blocks("body")
+    body = _blocks("body", block_kinds=standard_block_kinds())
     with pytest.raises(ValueError, match="two field setters"):
         PageType(
             tag="xtest-two-setters", name="Two setters", description="ad-hoc",
@@ -851,7 +907,7 @@ def test_two_do_eligible_setters_for_one_field_are_rejected():
 def test_a_block_argument_is_resolved_from_its_field():
     """A command factory names the section and field it builds for; the page type is the first
     thing holding both, so it is what turns that into a vocabulary."""
-    body = _blocks("body", block_kinds=("code", "paragraph"))
+    body = _blocks("body", block_kinds=(_code_block(), _paragraph_runs()))
     page_type = PageType(
         tag="xtest-resolved", name="Resolved", description="ad-hoc",
         sections=(SectionSpec("body", "Body", (body,)),),
@@ -864,7 +920,7 @@ def test_a_block_argument_is_resolved_from_its_field():
         ),
         fsm=FSMSpec(name="XTestResolved", initial="active", states=("active",)))
     add, remove = page_type.commands
-    assert add.args[0].block_kinds == body.block_vocabulary()
+    assert add.args[0].block_kinds == body.block_kinds
     assert [kind.kind for kind in add.args[0].block_kinds or ()] == ["code", "paragraph"]
     # An argument that carries no blocks is returned untouched, on either command.
     assert add.args[1].block_kinds is None and remove.args[0].block_kinds is None
@@ -878,10 +934,10 @@ def _targeted_vocabulary(page_type, command, arg):
     element_field = command.element_field or (
         arg.name if command.kind == ADD_ELEMENT else None)
     if element_field is None:
-        return field_spec.block_vocabulary()
+        return field_spec.block_kinds
     spec = field_spec.element_blocks_spec(element_field)
     assert spec is not None
-    return spec.vocabulary()
+    return spec.kinds
 
 
 def test_resolution_reproduces_the_declared_vocabularies():
@@ -917,7 +973,7 @@ def test_a_block_argument_that_cannot_be_resolved_is_rejected_at_import():
                       section="body", field="body",
                       args=(_array("blocks", content=BLOCK_ARRAY),))
     with pytest.raises(ValueError, match="not a declared field"):
-        page_type(SectionSpec("body", "Body", (_blocks("other"),)), add)
+        page_type(SectionSpec("body", "Body", (_blocks("other", block_kinds=standard_block_kinds()),)), add)
     with pytest.raises(ValueError, match="not a blocks field"):
         page_type(SectionSpec("body", "Body", (_prose("body"),)), add)
 

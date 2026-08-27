@@ -8,11 +8,12 @@ from . import (
     PageType,
     SectionSpec,
     _blocks,
+    _code_block,
     _list,
     _prose,
     _scalar,
     _text,
-    BlockKindSpec,
+    _paragraph_text,
     add_link_cmd,
     blocks_cmds,
     list_cmds,
@@ -59,8 +60,7 @@ _DECISION_RECORD = PageType(
                 """),
         )),
         SectionSpec("decision", "Decision", (
-            _blocks("body", block_kinds=(BlockKindSpec("paragraph", args=(_text(),)),
-                                         "code"), description="""
+            _blocks("body", block_kinds=(_paragraph_text(), _code_block()), description="""
                 What was decided, in the active voice and stated before any supporting detail, then
                 the options that were seriously weighed and what ruled each one out. Use a code
                 block for anything with a precise shape: an interface, a schema, a config. A record
@@ -69,7 +69,7 @@ _DECISION_RECORD = PageType(
                 """),
         )),
         SectionSpec("consequences", "Consequences", (
-            _blocks("body", block_kinds=(BlockKindSpec("paragraph", args=(_text(),)),),
+            _blocks("body", block_kinds=(_paragraph_text(),),
                     description="""
                 What this decision makes easy and what it makes hard, including the costs now to be
                 lived with, what it forecloses, and the follow-on work it creates. Consequences

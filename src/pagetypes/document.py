@@ -10,6 +10,7 @@ from . import (
     add_link_cmd,
     blocks_cmds,
     set_title_cmd,
+    standard_block_kinds,
 )
 
 _DOCUMENT = PageType(
@@ -21,7 +22,7 @@ _DOCUMENT = PageType(
     ),
     sections=(
         SectionSpec("body", "Body", (
-            _blocks("body", description="""
+            _blocks("body", block_kinds=standard_block_kinds(), description="""
                 The document body, built from structured blocks: headings so a reader can navigate,
                 paragraphs for prose, code blocks for anything with a precise shape, and tables for
                 anything genuinely tabular. Lead with what the reader needs first. Emphasis and links

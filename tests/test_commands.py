@@ -22,6 +22,7 @@ from src.pagetypes import (
     _blocks,
     _list,
     _prose,
+    _table_block,
     _text,
     add_link_cmd,
     blocks_cmds,
@@ -31,6 +32,7 @@ from src.pagetypes import (
     list_cmds,
     set_prose_cmd,
     set_title_cmd,
+    standard_block_kinds,
     transition_cmd,
 )
 
@@ -660,7 +662,7 @@ def test_is_field_setter_classifies_by_kind():
 # An ad-hoc, unregistered draft->sealed type: markSealed requires overview (prose) AND design (blocks),
 # both authored in `draft`. Built directly (not via the store/registry) to exercise the pure edge logic -
 # blocks grouping, legal_in gating, and stage-scoping - which no production-mirroring fixture covers.
-_DESIGN_BODY = _blocks("body", description="the design instruction")
+_DESIGN_BODY = _blocks("body", block_kinds=standard_block_kinds(), description="the design instruction")
 
 
 def _field_setter_page_type() -> PageType:
@@ -788,7 +790,7 @@ def items_of(page):
 
 def _unified_blocks_page_type() -> PageType:
     """An ad-hoc type whose body field carries the unified four-command block surface."""
-    body = _blocks("body", description="a rich-text blocks body")
+    body = _blocks("body", block_kinds=standard_block_kinds(), description="a rich-text blocks body")
     return PageType(
         tag="xtest-unified-blocks", name="Unified blocks fixture",
         description="ad-hoc fixture: one blocks field, one add and one set",
@@ -923,7 +925,7 @@ def _table_blocks_page_type() -> PageType:
     """An ad-hoc type whose element field accepts a table, so a table can be reached through an
     array argument. The shared fixtures deliberately declare narrower vocabularies."""
     items = _list("items", element_fields=("text", "detail"),
-                  element_blocks=(ElementBlocksSpec("detail", ("table",)),))
+                  element_blocks=(ElementBlocksSpec("detail", (_table_block(),)),))
     return PageType(
         tag="xtest-table-blocks", name="Table blocks fixture",
         description="ad-hoc fixture: an element block field accepting a table",
@@ -1160,8 +1162,8 @@ def test_a_field_override_is_enforced_at_the_command():
     """One kind name, two body shapes, decided by the field - the case the vocabulary exists for.
 
     test-child's decisions field declares `paragraph` with a plain `text` arg; test-blocks' body
-    takes the standard inline runs. Each rejects the other's shape. If any consumer fell back to
-    the global BLOCK_ARGS this would pass in one direction only.
+    takes the standard inline runs. Each rejects the other's shape. If any consumer read a shared
+    table instead of the kind's own args this would pass in one direction only.
     """
     factory = make_counter()
     child = create_page(CHILD_BLOCKS, "Child", None, factory)

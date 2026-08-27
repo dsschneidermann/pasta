@@ -26,11 +26,14 @@ from . import (
     SectionSpec,
     _blocks,
     _boolean,
-    _integer,
+    _code_block,
     _list,
+    _paragraph_runs,
     _prose,
     _scalar,
     _text,
+    _heading_text,
+    _paragraph_text,
     BlockKindSpec,
     add_link_cmd,
     blocks_cmds,
@@ -312,9 +315,9 @@ _FEATURE_SPEC = PageType(
         )),
         SectionSpec("design", "Design", (
             _blocks("body", block_kinds=(
-                BlockKindSpec("paragraph", args=(_text(),)),
-                BlockKindSpec("heading", args=(_integer("level"), _text())),
-                "code",
+                _paragraph_text(),
+                _heading_text(),
+                _code_block(),
             ), description="""
                 The design in enough detail that a plan can be written from it without making further
                 decisions: the behaviour, the interfaces with their exact signatures and types, the
@@ -379,7 +382,7 @@ _IMPLEMENTATION_PLAN = PageType(
     sections=(
         SectionSpec("steps", "Steps", (
             _list("items", element_fields=("detail", "status"), element_fsm=_STEP_FSM,
-                  element_blocks=(ElementBlocksSpec("detail", ("paragraph", "code")),),
+                  element_blocks=(ElementBlocksSpec("detail", (_paragraph_runs(), _code_block())),),
                   description="""
                 Each one action an implementer can finish in a few minutes, ordered, written for a
                 skilled developer who knows nothing about this codebase or its domain. Name the exact
@@ -396,7 +399,7 @@ _IMPLEMENTATION_PLAN = PageType(
                 """),
         )),
         SectionSpec("dataModels", "Data models", (
-            _blocks("models", block_kinds=("code",), description="""
+            _blocks("models", block_kinds=(_code_block(),), description="""
                 One code block per data shape this feature introduces or changes, written as real
                 declarations rather than prose: field names, types, and which are optional. Steps
                 refer to these by name, so the names and types here must match the ones the steps use
