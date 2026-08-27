@@ -174,10 +174,10 @@ _FEATURE_BRIEF = PageType(
                 """),
         )),
         SectionSpec("commits", "Commits", (
-            _list("items", element_fields=("sha", "message", "url", "stale"), description="""
-                Each a commit made for this feature while building: its sha, subject line, and a url
-                when one exists. Record each as you make it rather than reconstructing the list at the
-                end, and flag one stale once its sha has left history, for example after a rebase.
+            _list("items", element_fields=("sha", "message", "stale"), description="""
+                Each a commit made for this feature while building: its sha and subject line. Record
+                each as you make it rather than reconstructing the list at the end, and flag one
+                stale once its sha has left history, for example after a rebase.
                 """),
         )),
     ),
@@ -208,7 +208,7 @@ _FEATURE_BRIEF = PageType(
         set_scalar_cmd("pull_request", "url", name="setPullRequestUrl", label="pull request url",
                        legal_in=("review",)),
         *list_cmds("commits", add_name="recordCommit", label="recorded commit", remove=False,
-                   add_args=(_text("sha"), _text("message"), _text("url", required=False)),
+                   add_args=(_text("sha"), _text("message")),
                    legal_in=_COMMIT_LOG_STATES),
         set_element_field_cmd("commits", name="markCommitStale", const=("stale", True),
                               description="flag a recorded commit as stale - its sha is no longer in history (e.g. after a rebase)",

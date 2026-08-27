@@ -13,12 +13,15 @@ from . import (
     _text,
     add_link_cmd,
     list_cmds,
+    set_element_field_cmd,
     set_prose_cmd,
     set_scalar_cmd,
     set_title_cmd,
     transition_cmd,
     transition_on_add_cmd,
 )
+
+_COMMIT_LOG_STATES = ("open", "review", "done", "closed")
 
 _BUG_REPORT = PageType(
     tag="bug-report",
@@ -73,10 +76,11 @@ _BUG_REPORT = PageType(
                 """),
         )),
         SectionSpec("resolution", "Resolution", (
-            _list("fixCommits", element_fields=("sha", "message", "url"), description="""
-                Each a commit that fixes this defect, recorded as the bug is closed: the sha, its
-                subject line, and a url when one exists. Record the commit that actually lands the
-                fix, not the intermediate work that led to it.
+            _list("fixCommits", element_fields=("sha", "message", "stale"), description="""
+                Each a commit that fixes this defect: the sha and its subject line. Record each as
+                you make it rather than reconstructing the list at the end, and flag one stale once
+                its sha has left history, for example after a rebase. Record the commit that
+                actually lands the fix, not the intermediate work that led to it.
                 """),
         )),
     ),
@@ -99,12 +103,17 @@ _BUG_REPORT = PageType(
         # close is a human gate: a person confirms the fix is shippable/merged before it lands.
         transition_on_add_cmd("close", "done -> closed", section="resolution", field="fixCommits",
                      description="record a fix commit AND close the bug", agency="human",
-                     add_args=(_text("sha"), _text("message"), _text("url", required=False))),
+                     add_args=(_text("sha"), _text("message"))),
         transition_on_add_cmd("closeWithoutCommit", "done -> closed", section="resolution", field="fixCommits",
                      description="record a closing note (message only, no commit) AND close the bug", agency="human",
                      add_args=(_text("message"),)),
-        # fixCommits is populated only by `close`; reorder is offered for a uniform surface.
-        *list_cmds("resolution", field="fixCommits", label="fix commit", add=False, remove=False),
+        *list_cmds("resolution", field="fixCommits", add_name="recordCommit", label="fix commit",
+                   remove=False, add_args=(_text("sha"), _text("message")),
+                   legal_in=_COMMIT_LOG_STATES),
+        set_element_field_cmd("resolution", field="fixCommits", singular="fixCommit",
+                              name="markCommitStale", const=("stale", True),
+                              description="flag a recorded commit as stale - its sha is no longer in history (e.g. after a rebase)",
+                              legal_in=_COMMIT_LOG_STATES),
         transition_cmd("reopen", "closed -> open"),
         add_link_cmd(),
         set_title_cmd(),

@@ -13,12 +13,15 @@ from . import (
     _text,
     add_link_cmd,
     list_cmds,
+    set_element_field_cmd,
     set_prose_cmd,
     set_scalar_cmd,
     set_title_cmd,
     transition_cmd,
     transition_on_add_cmd,
 )
+
+_COMMIT_LOG_STATES = ("open", "review", "done", "closed")
 
 _SIMPLE_CHANGE = PageType(
     tag="simple-change",
@@ -64,9 +67,10 @@ _SIMPLE_CHANGE = PageType(
                 """),
         )),
         SectionSpec("resolution", "Resolution", (
-            _list("changeCommits", element_fields=("sha", "message", "url"), description="""
-                Each a commit that delivers this change, recorded as it is closed: the sha, its
-                subject line, and a url when one exists.
+            _list("changeCommits", element_fields=("sha", "message", "stale"), description="""
+                Each a commit that delivers this change: the sha and its subject line. Record each
+                as you make it rather than reconstructing the list at the end, and flag one stale
+                once its sha has left history, for example after a rebase.
                 """),
         )),
     ),
@@ -86,12 +90,17 @@ _SIMPLE_CHANGE = PageType(
         # close is a human gate: a person confirms the change is shippable/merged before it lands.
         transition_on_add_cmd("close", "done -> closed", section="resolution", field="changeCommits",
                      description="record a change commit AND close the change", agency="human",
-                     add_args=(_text("sha"), _text("message"), _text("url", required=False))),
+                     add_args=(_text("sha"), _text("message"))),
         transition_on_add_cmd("closeWithoutCommit", "done -> closed", section="resolution", field="changeCommits",
                      description="record a closing note (message only, no commit) AND close the change", agency="human",
                      add_args=(_text("message"),)),
-        # changeCommits is populated only by `close`; reorder is offered for a uniform surface.
-        *list_cmds("resolution", field="changeCommits", label="change commit", add=False, remove=False),
+        *list_cmds("resolution", field="changeCommits", add_name="recordCommit", label="change commit",
+                   remove=False, add_args=(_text("sha"), _text("message")),
+                   legal_in=_COMMIT_LOG_STATES),
+        set_element_field_cmd("resolution", field="changeCommits", singular="changeCommit",
+                              name="markCommitStale", const=("stale", True),
+                              description="flag a recorded commit as stale - its sha is no longer in history (e.g. after a rebase)",
+                              legal_in=_COMMIT_LOG_STATES),
         transition_cmd("reopen", "closed -> open"),
         add_link_cmd(),
         set_title_cmd(),
