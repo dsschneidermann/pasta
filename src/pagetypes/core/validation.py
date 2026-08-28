@@ -106,7 +106,7 @@ def validate_inline_content(content: str, value: Any) -> None:
 
 
 def validate_block(entry: Any, block_kinds: tuple[BlockKindSpec, ...]) -> None:
-    """Validate one block against the vocabulary its field declares.
+    """Validate one block against the block kinds its field declares.
 
     A block is an object carrying a `kind` the field declares plus exactly that kind's body args,
     each checked the way the per-kind command used to check it - so a block that is legal to
@@ -139,7 +139,7 @@ def validate_block(entry: Any, block_kinds: tuple[BlockKindSpec, ...]) -> None:
 
 
 def validate_blocks(value: Any, block_kinds: tuple[BlockKindSpec, ...]) -> None:
-    """Validate an array of blocks against the vocabulary its field declares."""
+    """Validate an array of blocks against the block kinds its field declares."""
     if not isinstance(value, list):
         raise ValidationError("A blocks value must be an array of blocks.")
     for entry in value:
@@ -156,9 +156,9 @@ def collect_ref_ids(content: str, value: Any,
     as the existing cross-page ref check does; a malformed run is left for that validation to reject.
     `TABLE_ALIGN` carries no runs, so it yields nothing.
 
-    `block_kinds` is the vocabulary of a BLOCK_ARRAY arg. Without it there is no way to know which of a
+    `block_kinds` is the kinds a BLOCK_ARRAY arg accepts. Without it there is no way to know which of a
     block's keys hold runs, so that shape yields nothing rather than guessing - and reading the
-    body args off the vocabulary is what keeps an overridden kind's runs reachable.
+    body args off the declared kinds is what keeps an overridden kind's runs reachable.
     """
     ids: list[str] = []
 
