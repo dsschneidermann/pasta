@@ -49,21 +49,26 @@ from . import (
 
 _STEP_FSM = ElementFSMSpec(
     name="Step",
-    initial="todo", states=("todo", "done"),
-    transitions=(("markDone", "todo", "done", "agent"), ("reopen", "done", "todo", "agent")),
-    checkmark_done="done",                       # a step is a checkbox: initial "todo" -> [ ], "done" -> [x]
+    initial="todo", states=("todo", "done", "skipped"),
+    transitions=(("markDone", "todo", "done", "agent"),
+                 ("reopen", "done", "todo", "agent"),
+                 ("skip", "todo", "skipped", "agent"),
+                 ("reopen", "skipped", "todo", "agent")),
+    checkmark_done="done",
 )
 _CASE_FSM = ElementFSMSpec(
     name="Case",
-    initial="pending", states=("pending", "passed", "failed"),
-    transitions=(("pass", "pending", "passed", "agent"), ("fail", "pending", "failed", "agent")),
-    checkmark_done="passed",                     # initial "pending" -> [ ], "passed" -> [x], "failed" -> no box
+    initial="pending", states=("pending", "passed", "failed", "skipped"),
+    transitions=(("pass", "pending", "passed", "agent"),
+                 ("fail", "pending", "failed", "agent"),
+                 ("skip", "pending", "skipped", "agent")),
+    checkmark_done="passed",
 )
 _QUESTION_FSM = ElementFSMSpec(
     name="Question",
     initial="open", states=("open", "answered"),
     transitions=(("answer", "open", "answered", "agent"),),
-)                                                # no checkmark_done -> open/answered render without a box
+)
 
 
 _VERDICTS = ("build-ready", "needs-changes", "needs-human-decision")
@@ -226,7 +231,7 @@ _FEATURE_BRIEF = PageType(
             ("documentation", "items"),
         )),
         transition_cmd("beginPlanning", "spec -> planning", requires=(("questions", "items"),), guards=(
-            ChildStateGuard("feature-spec", "sealed", "the feature spec must be sealed"),
+            ChildStateGuard("feature-spec", ("sealed",), "the feature spec must be sealed"),
         )),
         # planning -> planReview is gated on the three planning artifacts being finalized: the
         # implementation-plan and testing-plan children each `ready` and the feature-spec `sealed`
@@ -235,23 +240,33 @@ _FEATURE_BRIEF = PageType(
         # and an unsealed spec must not reach review. There must be an authored plan before it can
         # be reviewed.
         transition_cmd("submitPlan", "planning -> planReview", guards=(
-            ChildStateGuard("implementation-plan", "ready", "the implementation plan must be marked ready"),
-            ChildStateGuard("testing-plan", "ready", "the testing plan must be marked ready"),
-            ChildStateGuard("feature-spec", "sealed", "the feature spec must be sealed"),
+            ChildStateGuard("implementation-plan", ("ready",), "the implementation plan must be marked ready"),
+            ChildStateGuard("testing-plan", ("ready",), "the testing plan must be marked ready"),
+            ChildStateGuard("feature-spec", ("sealed",), "the feature spec must be sealed"),
         )),
         # planReview -> building requires a verdict to have been recorded (the review happened).
         # The verdict is a soft guide (requires only checks presence).
         transition_cmd("approvePlan", "planReview -> building", requires=(("review", "verdict"),)),
         transition_cmd("revisePlan", "planReview -> planning (send the plan back)"),
-        transition_cmd("submitForReview", "building -> review"),
+        # `submitForReview` and `ship` are both guarded on every step being done-or-skipped and every
+        # case passed-or-skipped (checked across the brief's child pages by the store): the review gate
+        # refuses unaddressed work, and a deliberately skipped item counts as addressed at both.
+        transition_cmd("submitForReview", "building -> review", guards=(
+            ChildStateGuard("implementation-plan", ("done", "skipped"),
+                            "every implementation-plan step must be done or skipped",
+                            section="steps", field="items"),
+            ChildStateGuard("testing-plan", ("passed", "skipped"),
+                            "every testing-plan case must be passed or skipped",
+                            section="cases", field="items"),
+        )),
         transition_cmd("reopenPlanning", "building -> planning"),
         transition_cmd("requestChanges", "review -> building", agency="either"),
-        # `ship` is a human gate AND is guarded: every implementation-plan step must be `done`
-        # and every testing-plan case `passed` (checked across the brief's child pages by the store).
         transition_cmd("ship", "review -> shipped (human gate)", agency="human", guards=(
-            ChildStateGuard("implementation-plan", "done", "every implementation-plan step must be done",
+            ChildStateGuard("implementation-plan", ("done", "skipped"),
+                            "every implementation-plan step must be done or skipped",
                             section="steps", field="items"),
-            ChildStateGuard("testing-plan", "passed", "every testing-plan case must be passed",
+            ChildStateGuard("testing-plan", ("passed", "skipped"),
+                            "every testing-plan case must be passed or skipped",
                             section="cases", field="items"),
         )),
         transition_cmd("abandon", "drop the work -> abandoned", agency="human",
@@ -419,6 +434,7 @@ _IMPLEMENTATION_PLAN = PageType(
         # building against a finalized plan. Only the structural edits above are `draft`-only.
         *element_cmds("steps", legal_in=("draft", "ready"),
                       marks=(("markStepDone", "markDone", "mark a step done"),
+                             ("markStepSkipped", "skip", "mark a step skipped"),
                              ("markStepTodo", "reopen", "reopen a step"))),
         # The field key is `models` under section `dataModels`, so the derived label would be
         # `models`; label= keeps the name the surface already reads with.
@@ -468,7 +484,8 @@ _TESTING_PLAN = PageType(
         # while building against a finalized plan. Only the structural edits above are `draft`-only.
         *element_cmds("cases", legal_in=("draft", "ready"),
                       marks=(("markCasePassed", "pass", "mark a case passed"),
-                             ("markCaseFailed", "fail", "mark a case failed"))),
+                             ("markCaseFailed", "fail", "mark a case failed"),
+                             ("markCaseSkipped", "skip", "mark a case skipped"))),
         transition_cmd("markReady", "draft -> ready", requires=(("cases", "items"),),
                        parent_guards=(_FEATURE_IN_PLANNING_OR_LATER,)),
         transition_cmd("reopen", "ready -> draft (unlocks structural edits)"),

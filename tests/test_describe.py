@@ -144,7 +144,7 @@ def test_describe_reports_block_bearing_element_fields():
     ]
     # The pre-existing keys are untouched beside it.
     assert field["elementFields"] == ["text", "snippet", "detail", "status"]
-    assert field["elementStates"] == ["todo", "done"]
+    assert field["elementStates"] == ["todo", "done", "skipped"]
     # A list declaring none reports None rather than an empty list.
     plain = describe_page_type(get_page_type("test-fields"))["sections"][1]["fields"][0]
     assert plain["elementBlocks"] is None
@@ -218,3 +218,10 @@ def test_a_blocks_field_reports_its_kinds():
         {"field": "snippet", "kinds": ["code"]},
         {"field": "detail", "kinds": ["paragraph", "code", "list"]},
     ]
+
+
+def test_describe_reports_the_skipped_element_state():
+    """The skip disposition must be advertised to authors, or a caller cannot know a case may be
+    skipped."""
+    checks = _fields_of("test-child")[("checks", "items")]
+    assert checks["elementStates"] == ["pending", "passed", "failed", "skipped"]

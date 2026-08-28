@@ -156,13 +156,15 @@ class ChildStateGuard:
     """A cross-page transition guard over the state of a page's children, evaluated in the store.
 
     For every child page of type `child_type`, in one of two forms:
-    - element form (`section`/`field` given): every element in that list field must have status
-      `required_status`;
-    - page form (`section`/`field` omitted): the child page's own status must equal `required_status`.
+    - element form (`section`/`field` given): every element in that list field must have a status
+      in `allowed`;
+    - page form (`section`/`field` omitted): the child page's own status must be in `allowed`.
+    `allowed` is the set of statuses that satisfy the guard - usually one, but more than one lets a
+    guard treat several as equivalent (e.g. a step counts as addressed when done or skipped).
     Otherwise the transition is rejected with `message`.
     """
     child_type: str
-    required_status: str
+    allowed: tuple[str, ...]
     message: str
     section: str | None = None                  # element form; omit for the page-status form
     field: str | None = None

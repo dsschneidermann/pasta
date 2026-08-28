@@ -95,15 +95,20 @@ from .pagetypes import (
 # Named distinctly from production so their diagram labels and cache identity never collide.
 _STEP_FSM = ElementFSMSpec(
     name="TestStep",
-    initial="todo", states=("todo", "done"),
-    transitions=(("markDone", "todo", "done", "agent"), ("reopen", "done", "todo", "agent")),
-    checkmark_done="done",                       # todo -> [ ], done -> [x]
+    initial="todo", states=("todo", "done", "skipped"),
+    transitions=(("markDone", "todo", "done", "agent"),
+                 ("reopen", "done", "todo", "agent"),
+                 ("skip", "todo", "skipped", "agent"),
+                 ("reopen", "skipped", "todo", "agent")),
+    checkmark_done="done",
 )
 _CHECK_FSM = ElementFSMSpec(
     name="TestCheck",
-    initial="pending", states=("pending", "passed", "failed"),
-    transitions=(("pass", "pending", "passed", "agent"), ("fail", "pending", "failed", "agent")),
-    checkmark_done="passed",                     # pending -> [ ], passed -> [x], failed -> no box
+    initial="pending", states=("pending", "passed", "failed", "skipped"),
+    transitions=(("pass", "pending", "passed", "agent"),
+                 ("fail", "pending", "failed", "agent"),
+                 ("skip", "pending", "skipped", "agent")),
+    checkmark_done="passed",
 )
 _QUESTION_FSM = ElementFSMSpec(
     name="TestQuestion",
@@ -260,7 +265,8 @@ TEST_FLOW = PageType(
 # variety (agent / human / either), a multi-source `abandon` OR-combined to a terminal state,
 # terminal states, a questions element-FSM + escalate (feeds `attention`), a pinned auto-child,
 # a `beginImplementation` guarded on that child's page status (a page-status ChildStateGuard),
-# and a `ship` guarded on that child's element states (two element-status ChildStateGuards).
+# and `submitForReview` + `ship` guarded on that child's element states (element-status
+# ChildStateGuards whose allowed set accepts done/passed or skipped).
 # ============================================================================
 TEST_LIFECYCLE = PageType(
     tag="test-lifecycle",
@@ -290,16 +296,23 @@ TEST_LIFECYCLE = PageType(
         # guard: the pinned test-child must be `ready` before building (exercises the page-status
         # form of ChildStateGuard, evaluated in the store).
         transition_cmd("beginImplementation", "planning -> building", requires=(("parts", "items"),),
-                       guards=(ChildStateGuard("test-child", "ready", "the test-child must be marked ready"),)),
-        transition_cmd("submitForReview", "building -> review (human gate)", agency="human"),
+                       guards=(ChildStateGuard("test-child", ("ready",), "the test-child must be marked ready"),)),
+        # `submitForReview` and `ship` are both guarded on the child's element states: every step
+        # done-or-skipped and every check passed-or-skipped (element-status guards checked across the
+        # page's child pages by the store). The review gate refuses unaddressed work; a skipped item
+        # counts as addressed at both.
+        transition_cmd("submitForReview", "building -> review (human gate)", agency="human", guards=(
+            ChildStateGuard("test-child", ("done", "skipped"), "every test-child step must be done",
+                            section="steps", field="items"),
+            ChildStateGuard("test-child", ("passed", "skipped"), "every test-child check must be passed",
+                            section="checks", field="items"),
+        )),
         transition_cmd("reopenPlanning", "building -> planning", agency="either"),
         transition_cmd("requestChanges", "review -> building", agency="either"),
-        # `ship` is a human gate AND is guarded: every child step must be `done` and every child
-        # check `passed` (element-status guards checked across the page's child pages by the store).
         transition_cmd("ship", "review -> done (human gate)", agency="human", guards=(
-            ChildStateGuard("test-child", "done", "every test-child step must be done",
+            ChildStateGuard("test-child", ("done", "skipped"), "every test-child step must be done",
                             section="steps", field="items"),
-            ChildStateGuard("test-child", "passed", "every test-child check must be passed",
+            ChildStateGuard("test-child", ("passed", "skipped"), "every test-child check must be passed",
                             section="checks", field="items"),
         )),
         transition_cmd("abandon", "drop the work -> abandoned", agency="either",
@@ -395,11 +408,13 @@ TEST_CHILD = PageType(
         # the structural add/remove/reorder commands are `draft`-only.
         *element_cmds("steps", legal_in=("draft", "ready"), marks=(
             ("markStepDone", "markDone", "mark a step done"),
+            ("markStepSkipped", "skip", "mark a step skipped"),
             ("markStepTodo", "reopen", "reopen a step"))),
         *list_cmds("checks", label="check", add_args=(_text(),), legal_in=("draft",)),
         *element_cmds("checks", legal_in=("draft", "ready"), marks=(
             ("markCheckPassed", "pass", "mark a check passed"),
-            ("markCheckFailed", "fail", "mark a check failed"))),
+            ("markCheckFailed", "fail", "mark a check failed"),
+            ("markCheckSkipped", "skip", "mark a check skipped"))),
         # The list twin of addDecision below: the same ref check, on an add_element.
         *list_cmds("notes", label="note", add_args=(_text("questionId"), _text()),
                    ref_check=RefCheck(arg="questionId", scope="parent", section="questions", field="items"),

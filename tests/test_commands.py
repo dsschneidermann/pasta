@@ -602,8 +602,8 @@ def test_step_lifecycle_and_ready_lock():
     ready = apply_command(done.page, CHILD, "markReady", {}, factory)
     legal = legal_commands(ready.page, CHILD)
     assert {name for name, ok in legal.items() if ok} == {
-        "reopen", "markStepDone", "markStepTodo", "markCheckPassed", "markCheckFailed", "addLink",
-        "setTitle"}
+        "reopen", "markStepDone", "markStepSkipped", "markStepTodo",
+        "markCheckPassed", "markCheckFailed", "markCheckSkipped", "addLink", "setTitle"}
     with pytest.raises(IllegalCommandError):
         _ = apply_command(ready.page, CHILD, "addStep", {"text": "late"}, factory)
 
@@ -619,6 +619,23 @@ def test_check_pass_and_fail_are_terminal():
     # passed is terminal - you cannot then fail it.
     with pytest.raises(IllegalCommandError):
         _ = apply_command(passed.page, CHILD, "markCheckFailed", {"checkId": check_id}, factory)
+
+
+def test_skip_is_legal_only_from_the_initial_state():
+    factory = make_counter()
+    child = new_child(factory)
+    s = apply_command(child, CHILD, "addStep", {"text": "build"}, factory)
+    step_id = s.created_id
+    c = apply_command(s.page, CHILD, "addCheck", {"text": "renders"}, factory)
+    check_id = c.created_id
+    done = apply_command(c.page, CHILD, "markStepDone", {"stepId": step_id}, factory)
+    # A done step has no skip edge - skip fires only from todo.
+    with pytest.raises(IllegalCommandError):
+        _ = apply_command(done.page, CHILD, "markStepSkipped", {"stepId": step_id}, factory)
+    passed = apply_command(done.page, CHILD, "markCheckPassed", {"checkId": check_id}, factory)
+    # skip fires only from pending, so a passed check cannot be skipped either.
+    with pytest.raises(IllegalCommandError):
+        _ = apply_command(passed.page, CHILD, "markCheckSkipped", {"checkId": check_id}, factory)
 
 
 def test_add_decision_carries_ref():

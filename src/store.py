@@ -927,12 +927,12 @@ class Store:
                 if child is None or child.type != guard.child_type:
                     continue
                 if guard.section is None or guard.field is None:
-                    # page-status form: the child page's own status must match
-                    if child.status != guard.required_status:
+                    # page-status form: the child page's own status must be allowed
+                    if child.status not in guard.allowed:
                         return (f"{guard.message} ('{child.id}' is '{child.status}')")
                     continue
                 for element in child.sections.get(guard.section, {}).get(guard.field, []):
-                    if element.get("status") != guard.required_status:
+                    if element.get("status") not in guard.allowed:
                         return (f"{guard.message} ('{child.id}' has an item in "
                                 f"status '{element.get('status')}')")
         return None

@@ -35,7 +35,7 @@ _QUESTION_FSM = ElementFSMSpec(
     name="Question",
     initial="open", states=("open", "answered"),
     transitions=(("answer", "open", "answered", "agent"),),
-)                                                # no checkmark_done -> open/answered render without a box
+)
 
 
 _VERDICTS = ("build-ready", "needs-changes", "needs-human-decision")
@@ -190,7 +190,7 @@ _EPIC = PageType(
         # is dispatched: the agent-plan child must be `ready` (a page-status guard, store-checked).
         transition_cmd("submitPlan", "decomposition -> planReview",
                        requires=(("workstreams", "items"), ("questions", "items")),
-                       guards=(ChildStateGuard("agent-plan", "ready",
+                       guards=(ChildStateGuard("agent-plan", ("ready",),
                                                "the agent plan must be marked ready"),)),
         # planReview -> executing requires a verdict to have been recorded (the review happened).
         # `build-ready` is the signal to proceed; `needs-changes` should `reviseDecomposition`
@@ -200,14 +200,14 @@ _EPIC = PageType(
         # executing -> review is guarded on every dispatch having been accepted (an element-status
         # guard across the pinned agent plan, checked in the store).
         transition_cmd("submitForReview", "executing -> review", guards=(
-            ChildStateGuard("agent-plan", "accepted", "every dispatch must be accepted",
+            ChildStateGuard("agent-plan", ("accepted",), "every dispatch must be accepted",
                             section="dispatches", field="items"),)),
         transition_cmd("reopenDecomposition", "executing -> decomposition"),
         transition_cmd("requestChanges", "review -> executing", agency="either"),
         # `ship` is a human gate AND is guarded: every child feature-brief must itself be `shipped`
         # (a page-status guard over the epic's NON-pinned children, checked in the store).
         transition_cmd("ship", "review -> shipped (human gate)", agency="human", guards=(
-            ChildStateGuard("feature-brief", "shipped",
+            ChildStateGuard("feature-brief", ("shipped",),
                             "every child feature-brief must be shipped"),)),
         transition_cmd("abandon", "drop the work -> abandoned", agency="human",
                        legal_in=("draft", "grounding", "decomposition", "planReview",
@@ -242,9 +242,9 @@ _MODEL_TIERS = ("cheap", "standard", "capable")
 
 
 # One run of one agent against one workstream. `accepted` is the SINGLE success terminal, which is
-# what lets an epic's `submitForReview` be a ChildStateGuard (that guard compares every element
-# against exactly one required status). A fix round is a `redispatch` of the same element, not a new
-# one, so the element itself records how many attempts a workstream took.
+# what lets an epic's `submitForReview` gate on it with a ChildStateGuard whose allowed set is just
+# `accepted`. A fix round is a `redispatch` of the same element, not a new one, so the element itself
+# records how many attempts a workstream took.
 _DISPATCH_FSM = ElementFSMSpec(
     name="Dispatch",
     initial="pending", states=("pending", "dispatched", "reported", "accepted", "blocked"),
@@ -255,7 +255,7 @@ _DISPATCH_FSM = ElementFSMSpec(
                  ("redispatch", "blocked", "dispatched", "agent"),    # unblocked, try again
                  ("block", "dispatched", "blocked", "agent"),
                  ("block", "reported", "blocked", "agent")),
-    checkmark_done="accepted",                   # pending -> [ ], accepted -> [x], the rest no box
+    checkmark_done="accepted",
 )
 
 

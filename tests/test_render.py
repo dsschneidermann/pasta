@@ -444,6 +444,25 @@ def test_render_check_checkbox_pending_passed_failed():
     assert "- [ ] c fail" not in md and "- [x] c fail" not in md
 
 
+def test_render_skipped_element_has_no_checkbox_but_keeps_its_suffix():
+    factory = make_counter()
+    child = get_page_type("test-child")
+    page = create_page(child, "Child", "test-lifecycle:x", factory)
+    page = apply_command(page, child, "addStep", {"text": "s skip"}, factory).page
+    page = apply_command(page, child, "addCheck", {"text": "c skip"}, factory).page
+    step_id = page.sections["steps"]["items"][0]["id"]
+    check_id = page.sections["checks"]["items"][0]["id"]
+    page = apply_command(page, child, "markStepSkipped", {"stepId": step_id}, factory).page
+    page = apply_command(page, child, "markCheckSkipped", {"checkId": check_id}, factory).page
+    md = render_page(page, child)
+    # skipped is neither the initial nor the checkmark_done state, so it renders with no box - but
+    # the trailing status label still surfaces the disposition.
+    assert "- s skip" in md and "- c skip" in md
+    assert "- [ ] s skip" not in md and "- [x] s skip" not in md
+    assert "- [ ] c skip" not in md and "- [x] c skip" not in md
+    assert "_[skipped]_" in md
+
+
 def test_render_question_has_no_checkbox():
     factory = make_counter()
     lifecycle = get_page_type("test-lifecycle")

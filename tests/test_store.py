@@ -248,26 +248,94 @@ def test_ship_guard_blocks_until_child_complete(store):
     ])
     store.mutate_page_batch(workspace.id, child.id, [{"command": "markReady"}])
 
-    # Drive the parent on to review (beginImplementation now also requires the ready child).
+    # Reach building. The review gate now refuses to advance while the step is todo and the check
+    # pending (the two element-status guards on submitForReview).
     store.mutate_page_batch(workspace.id, parent.id, [
         {"command": "addPart", "args": {"name": "Renderer"}},
         {"command": "beginImplementation"},
-        {"command": "submitForReview"},
     ])
-
-    # The pending step and check still block ship (the two element-status guards).
     with pytest.raises(IllegalCommandError):
-        store.mutate_page_batch(workspace.id, parent.id, [{"command": "ship"}])
+        store.mutate_page_batch(workspace.id, parent.id, [{"command": "submitForReview"}])
 
-    # Marks are recordable while the child is `ready`; complete both, then a (human) ship succeeds.
+    # Marks are recordable while the child is `ready`; address both, then review and a (human) ship
+    # both pass the guard.
     store.mutate_page_batch(workspace.id, child.id, [
         {"command": "markStepDone", "args": {"stepId": step_created[0]}}
     ])
     store.mutate_page_batch(workspace.id, child.id, [
         {"command": "markCheckPassed", "args": {"checkId": check_created[0]}}
     ])
+    store.mutate_page_batch(workspace.id, parent.id, [{"command": "submitForReview"}])
     shipped, _ = store.mutate_page_batch(workspace.id, parent.id, [{"command": "ship"}])
     assert shipped.status == "done"
+
+
+def test_skip_counts_as_addressed_for_review_and_ship(store):
+    workspace = store.create_workspace("demo")
+    result = store.create_page(workspace.id, "test-lifecycle", "Dark mode")
+    parent = result.page
+    child = _child(result, "test-child")
+
+    store.mutate_page_batch(workspace.id, parent.id, [
+        {"command": "setSummary", "args": {"text": "A dark theme."}},
+        {"command": "beginPlanning"},
+    ])
+    _, step_created = store.mutate_page_batch(workspace.id, child.id, [
+        {"command": "addStep", "args": {"text": "build"}}
+    ])
+    _, check_created = store.mutate_page_batch(workspace.id, child.id, [
+        {"command": "addCheck", "args": {"text": "renders"}}
+    ])
+    store.mutate_page_batch(workspace.id, child.id, [{"command": "markReady"}])
+    store.mutate_page_batch(workspace.id, parent.id, [
+        {"command": "addPart", "args": {"name": "Renderer"}},
+        {"command": "beginImplementation"},
+    ])
+
+    # A deliberately skipped step and check are addressed: the review gate opens and the (human)
+    # ship gate passes, because skipped is in each guard's allowed set.
+    store.mutate_page_batch(workspace.id, child.id, [
+        {"command": "markStepSkipped", "args": {"stepId": step_created[0]}}
+    ])
+    store.mutate_page_batch(workspace.id, child.id, [
+        {"command": "markCheckSkipped", "args": {"checkId": check_created[0]}}
+    ])
+    store.mutate_page_batch(workspace.id, parent.id, [{"command": "submitForReview"}])
+    shipped, _ = store.mutate_page_batch(workspace.id, parent.id, [{"command": "ship"}])
+    assert shipped.status == "done"
+
+
+def test_reopen_unskips_a_step(store):
+    workspace = store.create_workspace("demo")
+    result = store.create_page(workspace.id, "test-lifecycle", "Feature")
+    parent = result.page
+    child = _child(result, "test-child")
+
+    store.mutate_page_batch(workspace.id, parent.id, [
+        {"command": "setSummary", "args": {"text": "x"}},
+        {"command": "beginPlanning"},
+    ])
+    _, step_created = store.mutate_page_batch(workspace.id, child.id, [
+        {"command": "addStep", "args": {"text": "build"}}
+    ])
+    store.mutate_page_batch(workspace.id, child.id, [{"command": "markReady"}])
+    store.mutate_page_batch(workspace.id, parent.id, [
+        {"command": "addPart", "args": {"name": "R"}},
+        {"command": "beginImplementation"},
+    ])
+
+    # skip fires todo -> skipped; reopen fires skipped -> todo (the same reopen event that also
+    # fires done -> todo). The reopened step is unaddressed again, so the review gate rejects it.
+    store.mutate_page_batch(workspace.id, child.id, [
+        {"command": "markStepSkipped", "args": {"stepId": step_created[0]}}
+    ])
+    assert store.get_page(workspace.id, child.id).sections["steps"]["items"][0]["status"] == "skipped"
+    store.mutate_page_batch(workspace.id, child.id, [
+        {"command": "markStepTodo", "args": {"stepId": step_created[0]}}
+    ])
+    assert store.get_page(workspace.id, child.id).sections["steps"]["items"][0]["status"] == "todo"
+    with pytest.raises(IllegalCommandError):
+        store.mutate_page_batch(workspace.id, parent.id, [{"command": "submitForReview"}])
 
 
 def test_begin_implementation_blocked_until_children_ready(store):
@@ -469,19 +537,27 @@ def test_next_actions_ship_is_a_gated_human_gate(store):
         {"command": "setSummary", "args": {"text": "x"}},
         {"command": "beginPlanning"},                       # unlocks the child's parent-gated markReady
     ])
-    store.mutate_page_batch(workspace.id, child.id, [
-        {"command": "addStep", "args": {"text": "build"}}   # a pending step
+    _, step_created = store.mutate_page_batch(workspace.id, child.id, [
+        {"command": "addStep", "args": {"text": "build"}}
     ])
     store.mutate_page_batch(workspace.id, child.id, [
         {"command": "markReady"}                            # ready so beginImplementation is unblocked
+    ])
+    # Address the step so the review gate opens, reach review, then reopen it: ship is now a human
+    # gate that the reopened (todo) step blocks.
+    store.mutate_page_batch(workspace.id, child.id, [
+        {"command": "markStepDone", "args": {"stepId": step_created[0]}}
     ])
     store.mutate_page_batch(workspace.id, parent.id, [
         {"command": "addPart", "args": {"name": "R"}},
         {"command": "beginImplementation"},
         {"command": "submitForReview"}
     ])
+    store.mutate_page_batch(workspace.id, child.id, [
+        {"command": "markStepTodo", "args": {"stepId": step_created[0]}}
+    ])
     gates = {edge["command"]: edge for edge in store.next_actions(workspace.id, parent.id)["humanGates"]}
-    assert "ship" in gates and "blockedReason" in gates["ship"]               # blocked by the pending step
+    assert "ship" in gates and "blockedReason" in gates["ship"]               # blocked by the reopened step
 
 
 def test_next_actions_do_lists_stage_field_setters_with_shape(store):
