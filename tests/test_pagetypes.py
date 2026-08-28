@@ -80,6 +80,8 @@ from src.pagetypes.core.validation import (
     validate_block_kind_spec,
     validate_field_spec,
     validate_fsm_spec,
+    validate_page_type,
+    validate_page_types,
     validate_pagetype_block_args,
     validate_pagetype_setter_descriptions,
 )
@@ -1010,3 +1012,27 @@ def test_an_unresolvable_block_argument_is_left_unfilled_rather_than_raising():
         fsm=FSMSpec(name="XTestUnfilled", initial="active", states=("active",)))
     resolved = built.command("addBody")
     assert resolved is not None and resolved.args[0].block_kinds is None
+
+
+def test_validate_page_type_is_clean_for_every_registered_type():
+    # The extraction must not have made any real type invalid.
+    for page_type in ALL_TYPES.values():
+        assert validate_page_type(page_type) == []
+
+
+def test_validate_page_types_aggregates_every_defect_into_one_raise():
+    # A single type carrying two independent defects surfaces both, tag-prefixed, in one raise.
+    body = _blocks("body", block_kinds=standard_blocks())
+    broken = PageType(
+        tag="xtest-broken", name="Broken", description="ad-hoc",
+        sections=(SectionSpec("body", "Body", (body,)),),
+        commands=(set_prose_cmd("body"), *blocks_cmds("body")),
+        fsm=FSMSpec(name="XBroken", initial="active", states=("active",),
+                    state_guidance=(("nope", "x"),)),
+    )
+    with pytest.raises(ValueError) as exc:
+        validate_page_types({broken.tag: broken})
+    message = str(exc.value)
+    assert "two field setters" in message
+    assert "unknown state" in message
+    assert "xtest-broken:" in message

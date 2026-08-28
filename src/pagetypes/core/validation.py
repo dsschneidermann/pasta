@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
 from ...errors import ValidationError
@@ -313,6 +314,39 @@ def validate_pagetype_block_args(page_type: PageType) -> list[str]:
                     f"{command.section}.{command.field}.{element_field}, which is not declared "
                     f"as a block-bearing element field.")
     return errors
+
+
+def validate_page_type(page_type: PageType) -> list[str]:
+    """Every declaration rule for one page type, as a flat list of tag-prefixed messages.
+
+    Walks the whole structure once - every section's every field, the status FSM, and the
+    page-level command rules - and prefixes the page tag onto each message the per-part
+    validators return, so a caller aggregating across a registry can locate every finding.
+    """
+    errors: list[str] = []
+    for section in page_type.sections:
+        for field in section.fields:
+            errors.extend(validate_field_spec(field))
+    errors.extend(validate_fsm_spec(page_type.fsm))
+    errors.extend(validate_pagetype_field_setters(page_type))
+    errors.extend(validate_pagetype_setter_descriptions(page_type))
+    errors.extend(validate_pagetype_block_args(page_type))
+    return [f"{page_type.tag}: {error}" for error in errors]
+
+
+def validate_page_types(registry: Mapping[str, PageType]) -> None:
+    """Validate every page type in `registry` in one pass, collecting all errors.
+
+    Raises a single ValueError listing every declaration error found across the registry, or
+    returns None when all are well-formed. This is where validation runs - the primary flows
+    call it once at load, rather than each construction raising on the first problem it meets.
+    """
+    errors: list[str] = []
+    for page_type in registry.values():
+        errors.extend(validate_page_type(page_type))
+    if errors:
+        raise ValueError(
+            "Invalid page-type declarations:\n" + "\n".join(f"- {error}" for error in errors))
 
 
 def validate_fsm_spec(fsm: FSMSpec) -> list[str]:
