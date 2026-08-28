@@ -54,10 +54,10 @@ class PageType:
             for command in self.commands))
 
     def _resolved_arg(self, command: CommandSpec, arg: ArgSpec) -> ArgSpec:
-        """`arg` with its vocabulary filled in, or unchanged when it carries no blocks or the
+        """`arg` with its block kinds filled in, or unchanged when it carries no blocks or the
         target cannot be resolved.
 
-        Best-effort: this only ever fills a vocabulary in, never checks. A block argument whose
+        Best-effort: this only ever fills block kinds in, never checks. A block argument whose
         target does not resolve is left with block_kinds None - the "not a block argument"
         sentinel - and validate_pagetype_block_args reports it. That is safe because the primary
         flows validate before serving, so an unresolved argument never reaches a consumer.

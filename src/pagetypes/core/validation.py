@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     # Annotation only: a page type calls these, so importing it here at runtime
     # would point the dependency back the way it came.
     from .pagetype import PageType
-from .args import BlockKindSpec, CommandSpec, ElementBlocksSpec, _duplicate_block_kind_errors
+from .args import BlockKindSpec, CommandSpec, ElementBlocksSpec
 from .commands import is_field_setter
 from .fields import FieldSpec
 from .specs import ADD_ELEMENT, BLOCKS, LIST, SET_PROSE, SET_SCALAR, FSMSpec
@@ -278,7 +278,7 @@ def validate_pagetype_setter_descriptions(page_type: PageType) -> list[str]:
 
 
 def validate_pagetype_block_args(page_type: PageType) -> list[str]:
-    """Every block-carrying argument resolves to a field's blocks vocabulary.
+    """Every block-carrying argument resolves to the block kinds its field declares.
 
     The check side of PageType's best-effort block-vocab resolution: an argument the resolver
     left unfilled (block_kinds None) means the command targets no field, an undeclared field, a
@@ -362,6 +362,17 @@ def validate_fsm_spec(fsm: FSMSpec) -> list[str]:
     return errors
 
 
+def _duplicate_block_kind_errors(where: str, block_kinds: tuple[BlockKindSpec, ...]) -> list[str]:
+    """A field naming one kind twice is a declaration bug - the second is unreachable."""
+    errors: list[str] = []
+    seen: set[str] = set()
+    for block in block_kinds:
+        if block.kind in seen:
+            errors.append(f"{where}: block kinds name '{block.kind}' twice.")
+        seen.add(block.kind)
+    return errors
+
+
 def validate_block_kind_spec(spec: BlockKindSpec) -> list[str]:
     """A block kind is named."""
     if not spec.kind:
@@ -370,7 +381,7 @@ def validate_block_kind_spec(spec: BlockKindSpec) -> list[str]:
 
 
 def validate_element_blocks_spec(spec: ElementBlocksSpec) -> list[str]:
-    """A block-bearing element field names a non-empty, duplicate-free vocabulary."""
+    """A block-bearing element field names a non-empty, duplicate-free set of block kinds."""
     errors: list[str] = []
     if not spec.block_kinds:
         errors.append(f"{spec.field}: a block-bearing element field declares no block kinds.")
@@ -381,9 +392,9 @@ def validate_element_blocks_spec(spec: ElementBlocksSpec) -> list[str]:
 
 
 def validate_field_spec(field: FieldSpec) -> list[str]:
-    """A field's block vocabulary and block-bearing element fields are well-formed.
+    """A field's block kinds and block-bearing element fields are well-formed.
 
-    A blocks vocabulary is only valid on a blocks field, a blocks field declares one, and no kind
+    Block kinds are only valid on a blocks field, a blocks field declares them, and no kind
     is named twice; element_blocks are only valid on a list field, each naming one of its element
     fields exactly once. Recurses into every declared kind and element-blocks spec.
     """

@@ -104,17 +104,6 @@ class BlockKindSpec:
         return self.args
 
 
-def _duplicate_block_kind_errors(where: str, block_kinds: tuple[BlockKindSpec, ...]) -> list[str]:
-    """A field naming one kind twice is a declaration bug - the second is unreachable."""
-    errors: list[str] = []
-    seen: set[str] = set()
-    for block in block_kinds:
-        if block.kind in seen:
-            errors.append(f"{where}: block kinds name '{block.kind}' twice.")
-        seen.add(block.kind)
-    return errors
-
-
 @dataclass(frozen=True)
 class ElementBlocksSpec:
     """A LIST element field that holds an ordered array of blocks instead of a scalar value.

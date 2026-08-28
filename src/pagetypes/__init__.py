@@ -71,7 +71,6 @@ from .core.args import (
     _paragraph_runs,
     _paragraph_text,
     _quote_block,
-    _duplicate_block_kind_errors,
     _same_named,
     _table_block,
     _text,
@@ -110,6 +109,7 @@ from .core.pagetype import (
 )
 from .core.validation import (
     _block_ref_ids,
+    _duplicate_block_kind_errors,
     _reject_markdown,
     _validate_run,
     _validate_runs,
