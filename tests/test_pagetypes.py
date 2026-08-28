@@ -80,6 +80,7 @@ from src.pagetypes.core.validation import (
     validate_block_kind_spec,
     validate_field_spec,
     validate_fsm_spec,
+    validate_pagetype_setter_descriptions,
 )
 from src.testtypes import TEST_REGISTRY
 
@@ -321,33 +322,30 @@ def _drift_type(setter_description: str, field_description: str):
 
 def test_field_setter_with_an_empty_description_is_rejected():
     # The factories used to pass "" and rely on the mirror; nothing may ship description-less now.
-    with pytest.raises(ValueError):
-        _ = _drift_type("", "line one\nline two")
+    assert validate_pagetype_setter_descriptions(_drift_type("", "line one\nline two"))
 
 
 def test_field_setter_with_a_multiline_description_is_rejected():
     # An authoring instruction is a wrapped multi-line block; a setter takes one short line.
-    with pytest.raises(ValueError):
-        _ = _drift_type("line one\nline two", "line one\nline two")
+    assert validate_pagetype_setter_descriptions(_drift_type("line one\nline two", "line one\nline two"))
 
 
 def test_field_setter_repeating_a_single_line_field_instruction_is_rejected():
     # The equality branch, which is the only thing that catches a one-line instruction.
-    with pytest.raises(ValueError):
-        _ = _drift_type("the whole instruction", "the whole instruction")
+    assert validate_pagetype_setter_descriptions(_drift_type("the whole instruction", "the whole instruction"))
 
 
 def test_field_setter_targeting_an_unknown_field_is_still_rejected():
     # The pre-existing check must survive the guard rewrite it sat beside.
     from src.pagetypes import CommandSpec, FSMSpec, PageType, SectionSpec, _prose, _text
-    with pytest.raises(ValueError):
-        _ = PageType(
-            tag="xtest-ghost", name="Ghost", description="ad-hoc",
-            sections=(SectionSpec("summary", "Summary", (_prose("body", description="x"),)),),
-            commands=(CommandSpec("setGhost", SET_PROSE, "set the ghost",
-                                  section="summary", field="missing", args=(_text(),)),),
-            fsm=FSMSpec(name="XGhost", initial="active", states=("active",)),
-        )
+    ghost = PageType(
+        tag="xtest-ghost", name="Ghost", description="ad-hoc",
+        sections=(SectionSpec("summary", "Summary", (_prose("body", description="x"),)),),
+        commands=(CommandSpec("setGhost", SET_PROSE, "set the ghost",
+                              section="summary", field="missing", args=(_text(),)),),
+        fsm=FSMSpec(name="XGhost", initial="active", states=("active",)),
+    )
+    assert any("unknown field" in error for error in validate_pagetype_setter_descriptions(ghost))
 
 
 # ============================================================================
@@ -896,17 +894,18 @@ def test_two_do_eligible_setters_for_one_field_are_rejected():
     """A `do` field edge names one command, so a second would be silently dropped rather than
     raise. This is what makes the singular key safe against a future page type."""
     body = _blocks("body", block_kinds=standard_blocks())
-    with pytest.raises(ValueError, match="two field setters"):
-        PageType(
-            tag="xtest-two-setters", name="Two setters", description="ad-hoc",
-            sections=(SectionSpec("body", "Body", (body,)),),
-            commands=(set_prose_cmd("body"), *blocks_cmds("body")),
-            fsm=FSMSpec(name="XTestTwoSetters", initial="active", states=("active",)),
-        )
+    two_setters = PageType(
+        tag="xtest-two-setters", name="Two setters", description="ad-hoc",
+        sections=(SectionSpec("body", "Body", (body,)),),
+        commands=(set_prose_cmd("body"), *blocks_cmds("body")),
+        fsm=FSMSpec(name="XTestTwoSetters", initial="active", states=("active",)),
+    )
+    assert any("two field setters" in error
+               for error in validate_pagetype_field_setters(two_setters))
     # Every registered type passes it - the five collapsing blocks fields were the only ones
     # that ever carried more than one.
     for page_type in {**REGISTRY, **TEST_REGISTRY}.values():
-        validate_pagetype_field_setters(page_type)
+        assert validate_pagetype_field_setters(page_type) == []
 
 
 def test_a_block_argument_is_resolved_from_its_field():

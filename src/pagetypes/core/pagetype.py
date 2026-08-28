@@ -1,9 +1,9 @@
 """The page type itself: what a page of this type is made of, and how it is set up.
 
-Its post-init hook does the two things a declaration needs before anything reads it -
+Its post-init hook does the two setup steps a declaration needs before anything reads it -
 resolves each block argument's vocabulary from the field it targets, and derives the
-FSM transition table from the commands - then hands the finished declaration to the
-validators.
+FSM transition table from the commands. Whether the finished declaration is well-formed is
+a separate concern, checked by the validators in `validation.py`.
 """
 
 from __future__ import annotations
@@ -25,10 +25,6 @@ from .specs import (
     AutoChildSpec,
     FSMSpec,
 )
-from .validation import (
-    validate_pagetype_field_setters,
-    validate_pagetype_setter_descriptions,
-)
 
 
 @dataclass(frozen=True)
@@ -45,8 +41,6 @@ class PageType:
     def __post_init__(self):
         self._resolve_block_vocabularies()
         object.__setattr__(self.fsm, "transitions", status_transitions(self))
-        validate_pagetype_setter_descriptions(self)
-        validate_pagetype_field_setters(self)
 
     def _resolve_block_vocabularies(self) -> None:
         """Fill each block-carrying argument's accepted kinds in from the field it targets.

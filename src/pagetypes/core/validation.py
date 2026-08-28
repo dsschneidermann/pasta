@@ -215,14 +215,15 @@ def validate_table(header: Any, rows: Any, align: Any) -> None:
         )
 
 
-def validate_pagetype_field_setters(page_type: PageType) -> None:
-    """Reject a type declaring two do-eligible setters for one (section, field).
+def validate_pagetype_field_setters(page_type: PageType) -> list[str]:
+    """A type declares at most one do-eligible setter for one (section, field).
 
     A `do` field edge names one command, so a second would be silently dropped from the
     self-direction rollup - a failure that shows up as missing guidance rather than an error.
     Before the block commands collapsed, five blocks fields each declared one add per kind;
     now every field has exactly one, and this keeps it that way.
     """
+    errors: list[str] = []
     seen: dict[tuple[str, str], str] = {}
     for command in page_type.commands:
         if command.section is None or command.field is None:
@@ -231,20 +232,23 @@ def validate_pagetype_field_setters(page_type: PageType) -> None:
             continue
         target = (command.section, command.field)
         if target in seen:
-            raise ValueError(
-                f"{page_type.tag}: {target[0]}.{target[1]} has two field setters "
+            errors.append(
+                f"{target[0]}.{target[1]} has two field setters "
                 f"('{seen[target]}' and '{command.name}') - a `do` edge names one command."
             )
+            continue
         seen[target] = command.name
+    return errors
 
 
-def validate_pagetype_setter_descriptions(page_type: PageType) -> None:
+def validate_pagetype_setter_descriptions(page_type: PageType) -> list[str]:
     """A field setter (SET_SCALAR / SET_PROSE / ADD_ELEMENT) carries a short description of what it
     does ('set the summary', 'add a constraint'), never its field's authoring instruction: that
     lives once on the FieldSpec.description, and reaches an agent through describePageType's
     `sections` listing and the `instruction` key of a `next` field edge. Freeform blocks
     (ADD_BLOCK) already carry a short description and are untouched.
     """
+    errors: list[str] = []
     for command in page_type.commands:
         if command.kind not in (SET_SCALAR, SET_PROSE, ADD_ELEMENT):
             continue
@@ -252,22 +256,24 @@ def validate_pagetype_setter_descriptions(page_type: PageType) -> None:
         field_spec = (page_type.field_spec(section, field)
                       if section is not None and field is not None else None)
         if field_spec is None:
-            raise ValueError(
-                f"{page_type.tag}: field setter '{command.name}' targets unknown field " +
+            errors.append(
+                f"field setter '{command.name}' targets unknown field " +
                 f"'{command.section}.{command.field}'."
             )
+            continue
         if not command.description:
-            raise ValueError(
-                f"{page_type.tag}: field setter '{command.name}' has no description; it must carry a " +
+            errors.append(
+                f"field setter '{command.name}' has no description; it must carry a " +
                 f"short line saying what it sets."
             )
         if "\n" in command.description or command.description == field_spec.description:
-            raise ValueError(
-                f"{page_type.tag}: field setter '{command.name}' carries the authoring instruction as " +
+            errors.append(
+                f"field setter '{command.name}' carries the authoring instruction as " +
                 f"its description; that text belongs once on the " +
                 f"'{command.section}.{command.field}' FieldSpec, and the setter takes a short " +
                 f"one-line description instead."
             )
+    return errors
 
 
 def validate_fsm_spec(fsm: FSMSpec) -> list[str]:
