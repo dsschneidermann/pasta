@@ -77,7 +77,6 @@ from src.pagetypes import (
 )
 from src.pagetypes import _stage_guidance
 from src.pagetypes.core.validation import (
-    validate_block_kind_spec,
     validate_field_spec,
     validate_fsm_spec,
     validate_page_type,
@@ -551,7 +550,7 @@ def test_block_kind_spec_rejects_a_bad_declaration():
     custom = BlockKindSpec("decision", args=(_text("questionId"), _text()))
     assert custom.body_args() == (_text("questionId"), _text())
     assert any("non-empty name" in error
-               for error in validate_block_kind_spec(BlockKindSpec("", args=())))
+               for error in validate_field_spec(_blocks("body", block_kinds=(BlockKindSpec("", args=()),))))
 
 
 def test_block_kind_helpers():
@@ -641,6 +640,10 @@ def test_element_blocks_rejects_a_bad_declaration():
     assert any("no block kinds" in error for error in validate_field_spec(
         FieldSpec(key="items", kind=LIST, element_fields=("text", "detail"),
                   element_blocks=(ElementBlocksSpec("detail", ()),))))
+    # A block kind carrying an empty name is rejected through the element-blocks path too.
+    assert any("non-empty name" in error for error in validate_field_spec(
+        FieldSpec(key="items", kind=LIST, element_fields=("text", "detail"),
+                  element_blocks=(ElementBlocksSpec("detail", (BlockKindSpec("", args=()),)),))))
 
 
 def test_block_element_fields_names_the_declared_fields():

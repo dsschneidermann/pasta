@@ -373,13 +373,6 @@ def _duplicate_block_kind_errors(where: str, block_kinds: tuple[BlockKindSpec, .
     return errors
 
 
-def validate_block_kind_spec(spec: BlockKindSpec) -> list[str]:
-    """A block kind is named."""
-    if not spec.kind:
-        return ["A block kind must be a non-empty name."]
-    return []
-
-
 def validate_element_blocks_spec(spec: ElementBlocksSpec) -> list[str]:
     """A block-bearing element field names a non-empty, duplicate-free set of block kinds."""
     errors: list[str] = []
@@ -387,7 +380,8 @@ def validate_element_blocks_spec(spec: ElementBlocksSpec) -> list[str]:
         errors.append(f"{spec.field}: a block-bearing element field declares no block kinds.")
     errors.extend(_duplicate_block_kind_errors(spec.field, spec.block_kinds))
     for block in spec.block_kinds:
-        errors.extend(validate_block_kind_spec(block))
+        if not block.kind:
+            errors.append("A block kind must be a non-empty name.")
     return errors
 
 
@@ -405,7 +399,8 @@ def validate_field_spec(field: FieldSpec) -> list[str]:
         errors.append(f"{field.key}: a blocks field declares no block kinds.")
     errors.extend(_duplicate_block_kind_errors(field.key, field.block_kinds))
     for block in field.block_kinds:
-        errors.extend(validate_block_kind_spec(block))
+        if not block.kind:
+            errors.append("A block kind must be a non-empty name.")
     seen: set[str] = set()
     for blocks in field.element_blocks:
         if field.kind != LIST:
