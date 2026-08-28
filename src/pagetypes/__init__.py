@@ -115,8 +115,15 @@ from .core.validation import (
     _validate_runs,
     collect_ref_ids,
     validate_block,
+    validate_block_kind_spec,
     validate_blocks,
+    validate_element_blocks_spec,
+    validate_field_spec,
+    validate_fsm_spec,
     validate_inline_content,
+    validate_page_type,
+    validate_page_types,
+    validate_pagetype_block_args,
     validate_pagetype_field_setters,
     validate_pagetype_setter_descriptions,
     validate_table,
@@ -212,10 +219,18 @@ __all__ = [
     "transition_cmd",
     "transition_on_add_cmd",
     "validate_block",
+    "validate_block_kind_spec",
     "validate_blocks",
+    "validate_element_blocks_spec",
+    "validate_field_spec",
+    "validate_fsm_spec",
     "validate_inline_content",
+    "validate_page_type",
+    "validate_page_types",
+    "validate_pagetype_block_args",
     "validate_pagetype_field_setters",
     "validate_pagetype_setter_descriptions",
+    "validate_registry",
     "validate_table",
 ]
 
@@ -255,6 +270,13 @@ REGISTRY: dict[str, PageType] = {
     _DOCUMENT.tag: _DOCUMENT,
     _TOC.tag: _TOC,
 }
+
+
+def validate_registry() -> None:
+    """Validate every registered page type once, raising one aggregated ValueError on any
+    declaration error. The single entry point the primary flows (server start, HMR reload) call
+    so a misconfigured type fails loudly at load rather than surfacing piecemeal later."""
+    validate_page_types(REGISTRY)
 
 
 # --- Test-only page types ----------------------------------------------------

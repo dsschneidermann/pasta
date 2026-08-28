@@ -1036,3 +1036,9 @@ def test_validate_page_types_aggregates_every_defect_into_one_raise():
     assert "two field setters" in message
     assert "unknown state" in message
     assert "xtest-broken:" in message
+
+
+def test_validate_registry_passes_over_the_production_registry():
+    # The single entry point the primary flows call returns cleanly for the real registry.
+    from src.pagetypes import validate_registry
+    assert validate_registry() is None

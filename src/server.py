@@ -27,11 +27,16 @@ from .commands import transition_guidance
 from .describe import describe_mutations, describe_page_type
 from .errors import PastaError
 from .hmr_live_refresh import ws_reloader
-from .pagetypes import get_page_type, registered_tags
+from .pagetypes import get_page_type, registered_tags, validate_registry
 from .render import escape_markdown, render_workspace_links
 from .render_html import md2html
 from .serialize import page_to_dict
 from .store import Store
+
+# Fail fast: validate every page type once at load. This runs on a cold start and re-runs on
+# every HMR reload (this module re-executes then), so a misconfigured type surfaces every error
+# at once instead of piecemeal during a later request.
+validate_registry()
 
 DATA_DIR = os.environ.get("PASTA_DATA_DIR", ".pasta-data")
 STORE = Store(DATA_DIR)
