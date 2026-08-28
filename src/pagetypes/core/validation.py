@@ -276,6 +276,45 @@ def validate_pagetype_setter_descriptions(page_type: PageType) -> list[str]:
     return errors
 
 
+def validate_pagetype_block_args(page_type: PageType) -> list[str]:
+    """Every block-carrying argument resolves to a field's blocks vocabulary.
+
+    The check side of PageType's best-effort block-vocab resolution: an argument the resolver
+    left unfilled (block_kinds None) means the command targets no field, an undeclared field, a
+    non-blocks field, or an element field the list does not declare as block-bearing. Each such
+    argument would otherwise accept any block, describe itself as an untyped array, and lose its
+    cross-page ref check.
+    """
+    errors: list[str] = []
+    for command in page_type.commands:
+        for arg in command.args:
+            if arg.content != BLOCK_ARRAY:
+                continue
+            if command.section is None or command.field is None:
+                errors.append(f"command '{command.name}' carries blocks but targets no field.")
+                continue
+            field_spec = page_type.field_spec(command.section, command.field)
+            if field_spec is None:
+                errors.append(
+                    f"command '{command.name}' carries blocks for "
+                    f"{command.section}.{command.field}, which is not a declared field.")
+                continue
+            element_field = command.element_field or (
+                arg.name if command.kind == ADD_ELEMENT else None)
+            if element_field is None:
+                if field_spec.kind != BLOCKS:
+                    errors.append(
+                        f"command '{command.name}' carries blocks for "
+                        f"{command.section}.{command.field}, which is not a blocks field.")
+                continue
+            if field_spec.element_blocks_spec(element_field) is None:
+                errors.append(
+                    f"command '{command.name}' carries blocks for "
+                    f"{command.section}.{command.field}.{element_field}, which is not declared "
+                    f"as a block-bearing element field.")
+    return errors
+
+
 def validate_fsm_spec(fsm: FSMSpec) -> list[str]:
     """Every state_guidance pair names a declared state, and no state twice."""
     errors: list[str] = []

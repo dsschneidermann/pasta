@@ -54,39 +54,32 @@ class PageType:
             for command in self.commands))
 
     def _resolved_arg(self, command: CommandSpec, arg: ArgSpec) -> ArgSpec:
-        """`arg` with its vocabulary filled in, or unchanged when it carries no blocks.
+        """`arg` with its vocabulary filled in, or unchanged when it carries no blocks or the
+        target cannot be resolved.
 
-        Raises rather than leaving one unresolved: every consumer reads block_kinds as
-        "not a block argument" when it is None, so an unresolved argument would accept any
-        block, describe itself as an untyped array, and lose its cross-page ref check, with
-        nothing raising anywhere.
+        Best-effort: this only ever fills a vocabulary in, never checks. A block argument whose
+        target does not resolve is left with block_kinds None - the "not a block argument"
+        sentinel - and validate_pagetype_block_args reports it. That is safe because the primary
+        flows validate before serving, so an unresolved argument never reaches a consumer.
         """
         if arg.content != BLOCK_ARRAY:
             return arg
         if command.section is None or command.field is None:
-            raise ValueError(
-                f"{self.tag}: command '{command.name}' carries blocks but targets no field.")
+            return arg
         field_spec = self.field_spec(command.section, command.field)
         if field_spec is None:
-            raise ValueError(
-                f"{self.tag}: command '{command.name}' carries blocks for "
-                f"{command.section}.{command.field}, which is not a declared field.")
+            return arg
         # A list add carries one block argument per block-bearing element field, named after
         # it; an element-scoped block command names that field on the command instead.
         element_field = command.element_field or (
             arg.name if command.kind == ADD_ELEMENT else None)
         if element_field is None:
             if field_spec.kind != BLOCKS:
-                raise ValueError(
-                    f"{self.tag}: command '{command.name}' carries blocks for "
-                    f"{command.section}.{command.field}, which is not a blocks field.")
+                return arg
             return replace(arg, block_kinds=field_spec.block_kinds)
         element_blocks = field_spec.element_blocks_spec(element_field)
         if element_blocks is None:
-            raise ValueError(
-                f"{self.tag}: command '{command.name}' carries blocks for "
-                f"{command.section}.{command.field}.{element_field}, which is not declared "
-                f"as a block-bearing element field.")
+            return arg
         return replace(arg, block_kinds=element_blocks.block_kinds)
 
 

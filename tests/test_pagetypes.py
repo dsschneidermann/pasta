@@ -80,6 +80,7 @@ from src.pagetypes.core.validation import (
     validate_block_kind_spec,
     validate_field_spec,
     validate_fsm_spec,
+    validate_pagetype_block_args,
     validate_pagetype_setter_descriptions,
 )
 from src.testtypes import TEST_REGISTRY
@@ -960,12 +961,13 @@ def test_resolution_reproduces_the_declared_vocabularies():
     assert checked >= 8       # 7 page-level fields, plus the element-scoped add
 
 
-def test_a_block_argument_that_cannot_be_resolved_is_rejected_at_import():
-    """The only place a bad block declaration can be caught.
+def test_a_block_argument_that_cannot_be_resolved_is_reported_by_the_validator():
+    """The validator is where a bad block declaration is caught.
 
     Every consumer reads block_kinds as "not a block argument" when it is None, so an
     unresolved argument would accept any block, describe itself as an untyped array and lose
-    its cross-page ref check - silently, with nothing raising.
+    its cross-page ref check. validate_pagetype_block_args reports each reason the resolver
+    could not fill one in.
     """
     def page_type(section_spec, command):
         return PageType(
@@ -976,14 +978,35 @@ def test_a_block_argument_that_cannot_be_resolved_is_rejected_at_import():
     add = CommandSpec("addBody", ADD_BLOCK, "add blocks to the body",
                       section="body", field="body",
                       args=(_array("blocks", content=BLOCK_ARRAY),))
-    with pytest.raises(ValueError, match="not a declared field"):
-        page_type(SectionSpec("body", "Body", (_blocks("other", block_kinds=standard_blocks()),)), add)
-    with pytest.raises(ValueError, match="not a blocks field"):
-        page_type(SectionSpec("body", "Body", (_prose("body"),)), add)
+    undeclared = page_type(
+        SectionSpec("body", "Body", (_blocks("other", block_kinds=standard_blocks()),)), add)
+    assert any("not a declared field" in e for e in validate_pagetype_block_args(undeclared))
+    non_blocks = page_type(SectionSpec("body", "Body", (_prose("body"),)), add)
+    assert any("not a blocks field" in e for e in validate_pagetype_block_args(non_blocks))
 
     items = _list("items", element_fields=("text", "detail"))
     element_add = CommandSpec("addItemDetail", ADD_BLOCK, "add blocks to an item's detail",
                               section="items", field="items", element_field="detail",
                               args=(_text("itemId"), _array("blocks", content=BLOCK_ARRAY)))
-    with pytest.raises(ValueError, match="block-bearing element field"):
-        page_type(SectionSpec("items", "Items", (items,)), element_add)
+    bad_element = page_type(SectionSpec("items", "Items", (items,)), element_add)
+    assert any("block-bearing element field" in e for e in validate_pagetype_block_args(bad_element))
+
+    # A block-carrying command that names no field at all is the fourth reason.
+    no_field = CommandSpec("addLoose", ADD_BLOCK, "add loose blocks",
+                           args=(_array("blocks", content=BLOCK_ARRAY),))
+    loose = page_type(SectionSpec("body", "Body", (_prose("body"),)), no_field)
+    assert any("targets no field" in e for e in validate_pagetype_block_args(loose))
+
+
+def test_an_unresolvable_block_argument_is_left_unfilled_rather_than_raising():
+    """Resolution is best-effort setup: a block argument whose target cannot be resolved
+    constructs without raising and keeps block_kinds None (the not-a-block-argument sentinel)."""
+    add = CommandSpec("addBody", ADD_BLOCK, "add blocks to the body",
+                      section="body", field="body",
+                      args=(_array("blocks", content=BLOCK_ARRAY),))
+    built = PageType(
+        tag="xtest-unfilled", name="Unfilled", description="ad-hoc",
+        sections=(SectionSpec("body", "Body", (_prose("body"),)),), commands=(add,),
+        fsm=FSMSpec(name="XTestUnfilled", initial="active", states=("active",)))
+    resolved = built.command("addBody")
+    assert resolved is not None and resolved.args[0].block_kinds is None
