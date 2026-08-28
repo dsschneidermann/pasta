@@ -76,6 +76,7 @@ from src.pagetypes import (
     FSMSpec,
 )
 from src.pagetypes import _stage_guidance
+from src.pagetypes.core.validation import validate_fsm_spec
 from src.testtypes import TEST_REGISTRY
 
 _STANDARD_BLOCK_HELPERS = {
@@ -502,15 +503,15 @@ def test_guidance_for_returns_none_for_undeclared_state():
 
 
 def test_state_guidance_rejects_unknown_state():
-    # A typo in a state name fails at import rather than silently never appearing.
-    with pytest.raises(ValueError, match="unknown state"):
-        FSMSpec(name="G", initial="a", states=("a",), state_guidance=(("nope", "x"),))
+    # A typo in a state name is reported by the validator, not silently never appearing.
+    fsm = FSMSpec(name="G", initial="a", states=("a",), state_guidance=(("nope", "x"),))
+    assert any("unknown state" in error for error in validate_fsm_spec(fsm))
 
 
 def test_state_guidance_rejects_duplicate_state():
-    with pytest.raises(ValueError, match="twice"):
-        FSMSpec(name="G", initial="a", states=("a",),
-                state_guidance=(("a", "x"), ("a", "y")))
+    fsm = FSMSpec(name="G", initial="a", states=("a",),
+                  state_guidance=(("a", "x"), ("a", "y")))
+    assert any("twice" in error for error in validate_fsm_spec(fsm))
 
 
 def test_every_production_guidance_text_comes_from_the_stage_guidance_module():

@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from .pagetype import PageType
 from .args import BlockKindSpec, CommandSpec
 from .commands import is_field_setter
-from .specs import ADD_ELEMENT, SET_PROSE, SET_SCALAR
+from .specs import ADD_ELEMENT, SET_PROSE, SET_SCALAR, FSMSpec
 from .specs import (
     BLOCK_ARRAY,
     INLINE_RUNS,
@@ -267,3 +267,16 @@ def validate_pagetype_setter_descriptions(page_type: PageType) -> None:
                 f"'{command.section}.{command.field}' FieldSpec, and the setter takes a short " +
                 f"one-line description instead."
             )
+
+
+def validate_fsm_spec(fsm: FSMSpec) -> list[str]:
+    """Every state_guidance pair names a declared state, and no state twice."""
+    errors: list[str] = []
+    seen: set[str] = set()
+    for state, _text in fsm.state_guidance:
+        if state not in fsm.states:
+            errors.append(f"{fsm.name}: state_guidance names unknown state '{state}'.")
+        elif state in seen:
+            errors.append(f"{fsm.name}: state_guidance names '{state}' twice.")
+        seen.add(state)
+    return errors

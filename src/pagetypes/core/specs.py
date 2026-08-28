@@ -97,17 +97,12 @@ class FSMSpec:
     state_guidance: tuple[tuple[str, str], ...] = ()
 
     def __post_init__(self):
-        # A bad state name is rejected at import, not silently ignored.
-        seen: set[str] = set()
-        normalized: list[tuple[str, str]] = []
-        for state, text in self.state_guidance:
-            if state not in self.states:
-                raise ValueError(f"{self.name}: state_guidance names unknown state '{state}'.")
-            if state in seen:
-                raise ValueError(f"{self.name}: state_guidance names '{state}' twice.")
-            seen.add(state)
-            normalized.append((state, dedent(text.strip("\n")).rstrip()))
-        object.__setattr__(self, "state_guidance", tuple(normalized))
+        # Setup only: normalize each guidance text as authored (dedent a
+        # newline-stripped block, then rstrip). The state names are checked by
+        # validate_fsm_spec, not here.
+        normalized = tuple((state, dedent(text.strip("\n")).rstrip())
+                           for state, text in self.state_guidance)
+        object.__setattr__(self, "state_guidance", normalized)
 
     def guidance_for(self, state: str) -> str | None:
         """The stage instruction for `state`, or None when the type declares none for it."""
