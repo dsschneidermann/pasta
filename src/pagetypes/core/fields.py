@@ -26,10 +26,6 @@ class FieldSpec:
     description: str = ""
 
     def __post_init__(self):
-        # Setup only: an instruction is authored as an indented triple-quoted block wrapped at the
-        # source margin; strip that shared indentation so consumers get the text as authored. The
-        # wrap breaks are kept - markdown reflows a paragraph's newlines away. The block-kind and
-        # element_blocks rules are checked by validate_field_spec, not here.
         object.__setattr__(self, "description", dedent(self.description.strip("\n")).rstrip())
 
     def element_blocks_spec(self, element_field: str) -> ElementBlocksSpec | None:
