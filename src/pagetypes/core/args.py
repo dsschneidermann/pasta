@@ -100,21 +100,19 @@ class BlockKindSpec:
     args: tuple[ArgSpec, ...]
     ref_check: RefCheck | None = None
 
-    def __post_init__(self):
-        if not self.kind:
-            raise ValueError("A block kind must be a non-empty name.")
-
     def body_args(self) -> tuple[ArgSpec, ...]:
         return self.args
 
 
-def _reject_duplicate_blocks(where: str, block_kinds: tuple[BlockKindSpec, ...]) -> None:
+def _duplicate_block_kind_errors(where: str, block_kinds: tuple[BlockKindSpec, ...]) -> list[str]:
     """A field naming one kind twice is a declaration bug - the second is unreachable."""
+    errors: list[str] = []
     seen: set[str] = set()
     for block in block_kinds:
         if block.kind in seen:
-            raise ValueError(f"{where}: block kinds name '{block.kind}' twice.")
+            errors.append(f"{where}: block kinds name '{block.kind}' twice.")
         seen.add(block.kind)
+    return errors
 
 
 @dataclass(frozen=True)
@@ -126,12 +124,6 @@ class ElementBlocksSpec:
     """
     field: str
     block_kinds: tuple[BlockKindSpec, ...]
-
-    def __post_init__(self):
-        if not self.block_kinds:
-            raise ValueError(
-                f"{self.field}: a block-bearing element field declares no block kinds.")
-        _reject_duplicate_blocks(self.field, self.block_kinds)
 
 
 # --- Arg helpers -------------------------------------------------------------

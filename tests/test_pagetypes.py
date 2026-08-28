@@ -76,7 +76,11 @@ from src.pagetypes import (
     FSMSpec,
 )
 from src.pagetypes import _stage_guidance
-from src.pagetypes.core.validation import validate_fsm_spec
+from src.pagetypes.core.validation import (
+    validate_block_kind_spec,
+    validate_field_spec,
+    validate_fsm_spec,
+)
 from src.testtypes import TEST_REGISTRY
 
 _STANDARD_BLOCK_HELPERS = {
@@ -545,8 +549,8 @@ def test_block_kind_spec_rejects_a_bad_declaration():
         BlockKindSpec("decision")                        # args is required
     custom = BlockKindSpec("decision", args=(_text("questionId"), _text()))
     assert custom.body_args() == (_text("questionId"), _text())
-    with pytest.raises(ValueError, match="non-empty name"):
-        BlockKindSpec("", args=())
+    assert any("non-empty name" in error
+               for error in validate_block_kind_spec(BlockKindSpec("", args=())))
 
 
 def test_block_kind_helpers():
@@ -602,12 +606,12 @@ def test_field_spec_block_kinds():
 
 
 def test_field_spec_rejects_a_bad_block_vocabulary():
-    with pytest.raises(ValueError, match="only valid on a blocks field"):
-        FieldSpec(key="body", kind=PROSE, block_kinds=(_code_block(),))
-    with pytest.raises(ValueError, match="twice"):
-        _blocks("body", block_kinds=(_code_block(), _code_block()))
-    with pytest.raises(ValueError, match="declares no block kinds"):
-        FieldSpec(key="body", kind=BLOCKS, block_kinds=())
+    assert any("only valid on a blocks field" in error
+               for error in validate_field_spec(FieldSpec(key="body", kind=PROSE, block_kinds=(_code_block(),))))
+    assert any("twice" in error
+               for error in validate_field_spec(_blocks("body", block_kinds=(_code_block(), _code_block()))))
+    assert any("declares no block kinds" in error
+               for error in validate_field_spec(FieldSpec(key="body", kind=BLOCKS, block_kinds=())))
 
 
 # --- Block-bearing element fields --------------------------------------------
@@ -621,21 +625,21 @@ def test_element_blocks_spec_is_hashable():
 
 
 def test_element_blocks_rejects_a_bad_declaration():
-    # Every defect fails where the type is declared, not when someone tries to author the field.
-    with pytest.raises(ValueError, match="only valid on a list field"):
+    # Every defect is reported by the validator, not when someone tries to author the field.
+    assert any("only valid on a list field" in error for error in validate_field_spec(
         FieldSpec(key="body", kind=PROSE,
-                  element_blocks=(ElementBlocksSpec("detail", (_code_block(),)),))
-    with pytest.raises(ValueError, match="not one of element_fields"):
+                  element_blocks=(ElementBlocksSpec("detail", (_code_block(),)),))))
+    assert any("not one of element_fields" in error for error in validate_field_spec(
         FieldSpec(key="items", kind=LIST, element_fields=("text",),
-                  element_blocks=(ElementBlocksSpec("nope", (_code_block(),)),))
-    with pytest.raises(ValueError, match="twice"):
+                  element_blocks=(ElementBlocksSpec("nope", (_code_block(),)),))))
+    assert any("twice" in error for error in validate_field_spec(
         FieldSpec(key="items", kind=LIST, element_fields=("text", "detail"),
                   element_blocks=(ElementBlocksSpec("detail", (_code_block(),)),
-                                  ElementBlocksSpec("detail", (_paragraph_runs(),))))
+                                  ElementBlocksSpec("detail", (_paragraph_runs(),))))))
     # A field declared to hold blocks but accepting none could never be authored.
-    with pytest.raises(ValueError, match="no block kinds"):
+    assert any("no block kinds" in error for error in validate_field_spec(
         FieldSpec(key="items", kind=LIST, element_fields=("text", "detail"),
-                  element_blocks=(ElementBlocksSpec("detail", ()),))
+                  element_blocks=(ElementBlocksSpec("detail", ()),))))
 
 
 def test_block_element_fields_names_the_declared_fields():

@@ -10,9 +10,10 @@ if TYPE_CHECKING:
     # Annotation only: a page type calls these, so importing it here at runtime
     # would point the dependency back the way it came.
     from .pagetype import PageType
-from .args import BlockKindSpec, CommandSpec
+from .args import BlockKindSpec, CommandSpec, ElementBlocksSpec, _duplicate_block_kind_errors
 from .commands import is_field_setter
-from .specs import ADD_ELEMENT, SET_PROSE, SET_SCALAR, FSMSpec
+from .fields import FieldSpec
+from .specs import ADD_ELEMENT, BLOCKS, LIST, SET_PROSE, SET_SCALAR, FSMSpec
 from .specs import (
     BLOCK_ARRAY,
     INLINE_RUNS,
@@ -279,4 +280,53 @@ def validate_fsm_spec(fsm: FSMSpec) -> list[str]:
         elif state in seen:
             errors.append(f"{fsm.name}: state_guidance names '{state}' twice.")
         seen.add(state)
+    return errors
+
+
+def validate_block_kind_spec(spec: BlockKindSpec) -> list[str]:
+    """A block kind is named."""
+    if not spec.kind:
+        return ["A block kind must be a non-empty name."]
+    return []
+
+
+def validate_element_blocks_spec(spec: ElementBlocksSpec) -> list[str]:
+    """A block-bearing element field names a non-empty, duplicate-free vocabulary."""
+    errors: list[str] = []
+    if not spec.block_kinds:
+        errors.append(f"{spec.field}: a block-bearing element field declares no block kinds.")
+    errors.extend(_duplicate_block_kind_errors(spec.field, spec.block_kinds))
+    for block in spec.block_kinds:
+        errors.extend(validate_block_kind_spec(block))
+    return errors
+
+
+def validate_field_spec(field: FieldSpec) -> list[str]:
+    """A field's block vocabulary and block-bearing element fields are well-formed.
+
+    A blocks vocabulary is only valid on a blocks field, a blocks field declares one, and no kind
+    is named twice; element_blocks are only valid on a list field, each naming one of its element
+    fields exactly once. Recurses into every declared kind and element-blocks spec.
+    """
+    errors: list[str] = []
+    if field.block_kinds and field.kind != BLOCKS:
+        errors.append(f"{field.key}: block_kinds is only valid on a blocks field.")
+    if field.kind == BLOCKS and not field.block_kinds:
+        errors.append(f"{field.key}: a blocks field declares no block kinds.")
+    errors.extend(_duplicate_block_kind_errors(field.key, field.block_kinds))
+    for block in field.block_kinds:
+        errors.extend(validate_block_kind_spec(block))
+    seen: set[str] = set()
+    for blocks in field.element_blocks:
+        if field.kind != LIST:
+            errors.append(f"{field.key}: element_blocks is only valid on a list field.")
+        if blocks.field not in (field.element_fields or ()):
+            errors.append(
+                f"{field.key}: element_blocks names '{blocks.field}', which is not one of " +
+                f"element_fields."
+            )
+        if blocks.field in seen:
+            errors.append(f"{field.key}: element_blocks names '{blocks.field}' twice.")
+        seen.add(blocks.field)
+        errors.extend(validate_element_blocks_spec(blocks))
     return errors

@@ -9,7 +9,6 @@ from textwrap import dedent
 from .args import (
     BlockKindSpec,
     ElementBlocksSpec,
-    _reject_duplicate_blocks,
 )
 from .specs import BLOCKS, LIST, PROSE, SCALAR, TITLE_ELEMENT_FIELDS, ElementFSMSpec
 
@@ -27,30 +26,11 @@ class FieldSpec:
     description: str = ""
 
     def __post_init__(self):
-        # An instruction is authored as an indented triple-quoted block wrapped at the source
-        # margin; strip that shared indentation so consumers get the text as authored. The wrap
-        # breaks are kept - markdown reflows a paragraph's newlines away.
+        # Setup only: an instruction is authored as an indented triple-quoted block wrapped at the
+        # source margin; strip that shared indentation so consumers get the text as authored. The
+        # wrap breaks are kept - markdown reflows a paragraph's newlines away. The block-kind and
+        # element_blocks rules are checked by validate_field_spec, not here.
         object.__setattr__(self, "description", dedent(self.description.strip("\n")).rstrip())
-        # Checked where it is declared, so a typo fails at import rather than at authoring time.
-        if self.block_kinds and self.kind != BLOCKS:
-            raise ValueError(f"{self.key}: block_kinds is only valid on a blocks field.")
-        if self.kind == BLOCKS and not self.block_kinds:
-            raise ValueError(f"{self.key}: a blocks field declares no block kinds.")
-        _reject_duplicate_blocks(self.key, self.block_kinds)
-        # A block-bearing element field is checked where it is declared, so a typo fails at import
-        # rather than producing a field nothing can ever author.
-        seen: set[str] = set()
-        for blocks in self.element_blocks:
-            if self.kind != LIST:
-                raise ValueError(f"{self.key}: element_blocks is only valid on a list field.")
-            if blocks.field not in (self.element_fields or ()):
-                raise ValueError(
-                    f"{self.key}: element_blocks names '{blocks.field}', which is not one of " +
-                    f"element_fields."
-                )
-            if blocks.field in seen:
-                raise ValueError(f"{self.key}: element_blocks names '{blocks.field}' twice.")
-            seen.add(blocks.field)
 
     def element_blocks_spec(self, element_field: str) -> ElementBlocksSpec | None:
         """The block declaration for `element_field`, or None when it holds a scalar value."""
