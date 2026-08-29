@@ -292,9 +292,13 @@ def render_page_html(page: Page, page_type: PageType,
     A toc carries no subject matter and can hold no outgoing link, so it renders as its header and
     its child list alone: that list IS the table of contents.
     """
+    revision = ""
+    if page.status_revision_token is not None:
+        revision = (f'<span class="page-meta-sep">&nbsp;·&nbsp;rev&nbsp;</span>'
+                    f'<span class="page-revision">{_escape(page.status_revision_token)}</span>')
     head = (f'<header class="page-head"><h1 class="page-title">{_escape(page.title)}</h1>'
             f'<p class="page-meta"><span class="page-type">{_escape(page.type)}&nbsp;·&nbsp;</span>'
-            f'<span class="page-status">{_escape(page.status)}</span></p></header>')
+            f'<span class="page-status">{_escape(page.status)}</span>{revision}</p></header>')
     if page_type.tag == "toc":
         return f'<article class="pasta-page">{head}{_children_html(page, ref_context)}</article>'
     sections = "".join(_section_html(section, page, ref_context)

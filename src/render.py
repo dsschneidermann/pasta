@@ -319,7 +319,10 @@ def render_page(page: Page, page_type: PageType, level: int = 1,
     `ref_context` resolves inline `{ref}` runs and child-page links to titled links; omit it (a direct
     render with no workspace) and refs / children fall back to their bare ids.
     """
-    lines = [f"{'#' * level} {_plain(page.title, ref_context)}", "", f"*{page.type}* · `{page.status}`", ""]
+    meta = f"*{page.type}* · `{page.status}`"
+    if page.status_revision_token is not None:
+        meta += f" · rev `{page.status_revision_token}`"
+    lines = [f"{'#' * level} {_plain(page.title, ref_context)}", "", meta, ""]
     section_heading = "#" * (level + 1)
     for section in page_type.sections:
         chunks = [_field_content(field_spec, page.sections.get(section.key, {}).get(field_spec.key), ref_context)

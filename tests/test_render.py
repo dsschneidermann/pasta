@@ -41,6 +41,15 @@ def test_render_fields_markdown():
     assert "Item text." in md
 
 
+def test_meta_line_shows_the_revision_only_when_present():
+    page = create_page(FIELDS, "Page title", None, make_counter())
+    # A page carrying no token (created before the feature) renders the bare type/status meta line.
+    assert " · rev `" not in render_page(page, FIELDS)
+    # Once it carries one, the meta line surfaces it beside the status.
+    page.status_revision_token = "042917"
+    assert "· rev `042917`" in render_page(page, FIELDS)
+
+
 def test_render_blocks_heading_and_code():
     factory = make_counter()
     page = create_page(BLOCKS, "Doc", None, factory)

@@ -44,7 +44,7 @@ def test_page_view_renders_body_and_sidebar(client):
     workspace = server.STORE.create_workspace("demo")
     page = server.STORE.create_page(workspace.id, "test-fields", "Page title").page
     server.STORE.mutate_page_batch(workspace.id, page.id, [
-        {"command": "setBody", "args": {"text": "The body."}}
+        {"command": "setBody", "args": {"text": "The body."}, "statusRevisionToken": page.status_revision_token}
     ])
     part = workspace.id.removeprefix("ws:")
     response = client.get(f"/ws:{part}/page/{page.id}")
@@ -165,8 +165,8 @@ def test_page_view_renders_the_structured_body(client):
     workspace = server.STORE.create_workspace("demo")
     page = server.STORE.create_page(workspace.id, "test-fields", "Page title").page
     server.STORE.mutate_page_batch(workspace.id, page.id, [
-        {"command": "setBody", "args": {"text": "The body."}},
-        {"command": "addItem", "args": {"text": "Item one", "note": "a note"}},
+        {"command": "setBody", "args": {"text": "The body."}, "statusRevisionToken": page.status_revision_token},
+        {"command": "addItem", "args": {"text": "Item one", "note": "a note"}, "statusRevisionToken": page.status_revision_token},
     ])
     part = workspace.id.removeprefix("ws:")
     response = client.get(f"/ws:{part}/page/{page.id}")

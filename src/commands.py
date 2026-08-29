@@ -187,6 +187,7 @@ def _field_setter_edge(page: Page, page_type: PageType, section: str, field: str
         "section": section, "field": field,
         "instruction": field_spec.description.strip() if field_spec is not None else "",
         "command": command_name,
+        "statusRevisionToken": page.status_revision_token,
     }
 
 

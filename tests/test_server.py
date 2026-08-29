@@ -33,6 +33,17 @@ def call(mcp, name, args=None):
     return asyncio.run(_run())
 
 
+def _mutate(mcp, args):
+    """Call mutatePageBatch presenting the page's current status_revision_token on each command - the
+    ordinary caller pattern (read the token, then write against it). getPage returns the raw
+    serialized page, so the token is under its snake_case key."""
+    page = call(mcp, "getPage", {"workspaceId": args["workspaceId"], "pageId": args["pageId"]})
+    token = page["status_revision_token"]
+    stamped = {**args, "commands": [{**command, "statusRevisionToken": token}
+                                    for command in args["commands"]]}
+    return call(mcp, "mutatePageBatch", stamped)
+
+
 def test_end_to_end_authoring_flow(mcp):
     workspace = call(mcp, "createWorkspace", {"name": "demo"})
     workspace_id = workspace["id"]
@@ -47,13 +58,13 @@ def test_end_to_end_authoring_flow(mcp):
     assert fetched["status"] == "draft"
 
     # Content mutation round-trips.
-    call(mcp, "mutatePageBatch", {"workspaceId": workspace_id, "pageId": page_id,
+    _mutate(mcp, {"workspaceId": workspace_id, "pageId": page_id,
                             "commands": [{"command": "setSummary", "args": {"text": "The body."}}]})
     fetched = call(mcp, "getPage", {"workspaceId": workspace_id, "pageId": page_id})
     assert fetched["sections"]["summary"]["body"] == "The body."
 
     # Transition advances status and the echoed legal set updates.
-    result = call(mcp, "mutatePageBatch",
+    result = _mutate(mcp,
                   {"workspaceId": workspace_id, "pageId": page_id, "commands": [{"command": "open"}]})
     assert result["status"] == "open"
     # The sole `do` edge from `open` is the `close` transition, now shaped kind='transition'
@@ -82,7 +93,7 @@ def test_illegal_mutation_surfaces_as_tool_error(mcp):
     page = call(mcp, "createPage",
                 {"workspaceId": workspace["id"], "type": "test-flow", "title": "A change"})
     with pytest.raises(ToolError):
-        call(mcp, "mutatePageBatch",
+        _mutate(mcp,
              {"workspaceId": workspace["id"], "pageId": page["id"], "commands": [{"command": "reopen"}]})  # illegal from draft
 
 
@@ -101,12 +112,12 @@ def test_lifecycle_transition_blocked_until_required_fields(mcp):
     availability = {entry["name"]: entry["available"] for entry in mutations["commands"]}
     assert availability["beginPlanning"] is False
     with pytest.raises(ToolError):
-        call(mcp, "mutatePageBatch", {"workspaceId": wid, "pageId": pid, "commands": [{"command": "beginPlanning"}]})
+        _mutate(mcp, {"workspaceId": wid, "pageId": pid, "commands": [{"command": "beginPlanning"}]})
 
     # Once the summary is set, the transition is legal and advances the status.
-    call(mcp, "mutatePageBatch", {"workspaceId": wid, "pageId": pid,
+    _mutate(mcp, {"workspaceId": wid, "pageId": pid,
                             "commands": [{"command": "setSummary", "args": {"text": "A dark theme."}}]})
-    result = call(mcp, "mutatePageBatch", {"workspaceId": wid, "pageId": pid, "commands": [{"command": "beginPlanning"}]})
+    result = _mutate(mcp, {"workspaceId": wid, "pageId": pid, "commands": [{"command": "beginPlanning"}]})
     assert result["status"] == "planning"
     # The next transition is itself gated: beginImplementation needs a part first, so it is not yet a
     # `do` edge (each `do` edge carries a `commands` array).
@@ -114,11 +125,11 @@ def test_lifecycle_transition_blocked_until_required_fields(mcp):
     # beginImplementation also carries a page-status guard on the pinned child (it must be `ready`).
     # The child's own markReady is parent-gated, so it only becomes possible now that we are in
     # `planning`; ready it here so the rest of this test isolates the required-content gates.
-    call(mcp, "mutatePageBatch", {"workspaceId": wid, "pageId": child_id, "commands": [
+    _mutate(mcp, {"workspaceId": wid, "pageId": child_id, "commands": [
         {"command": "addStep", "args": {"text": "build"}}, {"command": "markReady"}]})
-    call(mcp, "mutatePageBatch", {"workspaceId": wid, "pageId": pid,
+    _mutate(mcp, {"workspaceId": wid, "pageId": pid,
                             "commands": [{"command": "addPart", "args": {"name": "Renderer"}}]})
-    result = call(mcp, "mutatePageBatch", {"workspaceId": wid, "pageId": pid, "commands": [{"command": "beginImplementation"}]})
+    result = _mutate(mcp, {"workspaceId": wid, "pageId": pid, "commands": [{"command": "beginImplementation"}]})
     assert result["status"] == "building"
 
 
@@ -126,7 +137,7 @@ def test_batch_and_next_actions_via_server(mcp):
     workspace = call(mcp, "createWorkspace", {"name": "demo"})
     wid = workspace["id"]
     page = call(mcp, "createPage", {"workspaceId": wid, "type": "test-lifecycle", "title": "F"})
-    result = call(mcp, "mutatePageBatch", {"workspaceId": wid, "pageId": page["id"], "commands": [
+    result = _mutate(mcp, {"workspaceId": wid, "pageId": page["id"], "commands": [
         {"command": "setSummary", "args": {"text": "S"}},
         {"command": "addPart", "args": {"name": "P"}},
         {"command": "beginPlanning"},
@@ -135,7 +146,7 @@ def test_batch_and_next_actions_via_server(mcp):
     # Ready the pinned child so beginImplementation clears its page-status guard and stays a `do` edge.
     # The parent is in `planning`, which is what unlocks the child's parent-gated markReady.
     child_id = page["children"][0]["id"]
-    call(mcp, "mutatePageBatch", {"workspaceId": wid, "pageId": child_id, "commands": [
+    _mutate(mcp, {"workspaceId": wid, "pageId": child_id, "commands": [
         {"command": "addStep", "args": {"text": "build"}}, {"command": "markReady"}]})
     actions = call(mcp, "nextActions", {"workspaceId": wid})
     # agent edge from `planning`; every `do` edge carries a `commands` array (singular `command` is gone)
@@ -149,7 +160,7 @@ def test_echoed_next_carries_stage_field_setters(mcp):
     assert "setSummary" in {edge["command"] for edge in created["next"]["do"]}
     # mutatePageBatch echoes the same rollup: after advancing to `planning`, the new stage's field
     # setter (addPart) shows and the previous stage's setSummary drops out (stage-scoping).
-    result = call(mcp, "mutatePageBatch", {"workspaceId": wid, "pageId": created["id"], "commands": [
+    result = _mutate(mcp, {"workspaceId": wid, "pageId": created["id"], "commands": [
         {"command": "setSummary", "args": {"text": "S"}},
         {"command": "beginPlanning"},
     ]})
@@ -171,7 +182,7 @@ def test_archive_page_via_server(mcp):
         call(mcp, "tree", {"workspaceId": wid, "includeArchived": True})
     assert call(mcp, "getPage", {"workspaceId": wid, "pageId": page["id"]})["archived"] is True
     with pytest.raises(ToolError):
-        call(mcp, "mutatePageBatch", {"workspaceId": wid, "pageId": page["id"],
+        _mutate(mcp, {"workspaceId": wid, "pageId": page["id"],
                                 "commands": [{"command": "setBody", "args": {"text": "x"}}]})
     call(mcp, "unarchivePage", {"workspaceId": wid, "pageId": page["id"]})
     assert len(call(mcp, "tree", {"workspaceId": wid})["nodes"]) == 1
@@ -226,13 +237,13 @@ def test_add_link_via_server(mcp):
     mutations = call(mcp, "describeMutations", {"workspaceId": wid, "pageId": a})
     assert "addLink" in {entry["name"] for entry in mutations["commands"]}
 
-    call(mcp, "mutatePageBatch", {"workspaceId": wid, "pageId": a,
+    _mutate(mcp, {"workspaceId": wid, "pageId": a,
                                   "commands": [{"command": "addLink",
                                                 "args": {"toId": b, "role": "depends-on"}}]})
     assert call(mcp, "getPage", {"workspaceId": wid, "pageId": a})["links"] == [{"to": b, "role": "depends-on"}]
     # It obeys the same rules as the link tool: a duplicate edge is rejected.
     with pytest.raises(ToolError):
-        call(mcp, "mutatePageBatch", {"workspaceId": wid, "pageId": a,
+        _mutate(mcp, {"workspaceId": wid, "pageId": a,
                                       "commands": [{"command": "addLink",
                                                     "args": {"toId": b, "role": "depends-on"}}]})
 
@@ -251,8 +262,8 @@ def test_flow_close_flow(mcp):
     page = call(mcp, "createPage",
                 {"workspaceId": workspace["id"], "type": "test-flow", "title": "Crash"})
     pid = page["id"]
-    call(mcp, "mutatePageBatch", {"workspaceId": workspace["id"], "pageId": pid, "commands": [{"command": "open"}]})
-    result = call(mcp, "mutatePageBatch", {"workspaceId": workspace["id"], "pageId": pid,
+    _mutate(mcp, {"workspaceId": workspace["id"], "pageId": pid, "commands": [{"command": "open"}]})
+    result = _mutate(mcp, {"workspaceId": workspace["id"], "pageId": pid,
                                      "commands": [{"command": "close", "args": {"sha": "abc", "message": "fixed"}}]})
     assert result["status"] == "closed"
     assert result["createdIds"][0] is not None
@@ -275,7 +286,7 @@ def _flow_page(mcp):
 
 def test_mutate_page_batch_echoes_guidance_on_transition(mcp):
     workspace_id, page_id = _flow_page(mcp)
-    result = call(mcp, "mutatePageBatch",
+    result = _mutate(mcp,
                   {"workspaceId": workspace_id, "pageId": page_id,
                    "commands": [{"command": "open"}]})
     assert result["status"] == "open"
@@ -284,22 +295,24 @@ def test_mutate_page_batch_echoes_guidance_on_transition(mcp):
 
 def test_mutate_page_batch_omits_guidance_on_a_content_only_write(mcp):
     workspace_id, page_id = _flow_page(mcp)
-    result = call(mcp, "mutatePageBatch",
+    result = _mutate(mcp,
                   {"workspaceId": workspace_id, "pageId": page_id,
                    "commands": [{"command": "setSummary", "args": {"text": "x"}}]})
     # Absent, not null, so an unguided write is byte-identical to before the feature.
     assert "guidance" not in result
 
 
-def test_mutate_page_batch_echoes_only_the_final_state(mcp):
-    # Two transitions in one batch: only the final state's text may be echoed.
+def test_two_transitions_in_one_batch_are_rejected(mcp):
+    # A transition regenerates the status revision, so a second transition in the same batch carries
+    # a now-stale token and the whole batch aborts - at most one transition per batch, at its end.
     workspace_id, page_id = _flow_page(mcp)
-    result = call(mcp, "mutatePageBatch",
-                  {"workspaceId": workspace_id, "pageId": page_id,
-                   "commands": [{"command": "open"},
-                                {"command": "close", "args": {"sha": "abc", "message": "done"}}]})
-    assert result["status"] == "closed"
-    assert "guidance" not in result
+    with pytest.raises(ToolError, match="command 1"):
+        _mutate(mcp,
+               {"workspaceId": workspace_id, "pageId": page_id,
+                "commands": [{"command": "open"},
+                             {"command": "close", "args": {"sha": "abc", "message": "done"}}]})
+    # All-or-nothing: nothing committed, so the page is still in draft.
+    assert call(mcp, "getPage", {"workspaceId": workspace_id, "pageId": page_id})["status"] == "draft"
 
 
 def test_create_page_echoes_initial_state_guidance_and_children_do_not(mcp):
@@ -322,3 +335,23 @@ def test_create_page_echoes_initial_state_guidance_and_children_do_not(mcp):
     assert "guidance" not in parent
     assert parent["children"]                                   # the pinned child was created
     assert all("guidance" not in entry for entry in parent["children"])
+
+
+def test_status_revision_surfaced_and_echoed_via_server(mcp):
+    wid = call(mcp, "createWorkspace", {"name": "demo"})["id"]
+    created = call(mcp, "createPage", {"workspaceId": wid, "type": "test-flow", "title": "A"})
+    token = created["statusRevisionToken"]                         # createPage echoes the new token
+    assert isinstance(token, str) and len(token) == 6 and token.isdigit()
+    # getPage surfaces it under the raw serialized (snake_case) key.
+    assert call(mcp, "getPage", {"workspaceId": wid, "pageId": created["id"]})["status_revision_token"] == token
+    # A content write echoes the (unchanged) token; a transition echoes a fresh one.
+    result = _mutate(mcp, {"workspaceId": wid, "pageId": created["id"],
+                          "commands": [{"command": "setSummary", "args": {"text": "s"}}]})
+    assert result["statusRevisionToken"] == token
+    opened = _mutate(mcp, {"workspaceId": wid, "pageId": created["id"], "commands": [{"command": "open"}]})
+    assert opened["status"] == "open" and opened["statusRevisionToken"] != token
+    # A wrong token surfaces as a ToolError rather than mutating.
+    with pytest.raises(ToolError, match="does not match"):
+        call(mcp, "mutatePageBatch", {"workspaceId": wid, "pageId": created["id"],
+                                      "commands": [{"command": "close", "args": {"sha": "a", "message": "m"},
+                                                    "statusRevisionToken": "nope"}]})

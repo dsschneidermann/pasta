@@ -37,10 +37,22 @@ def new_id(prefix: str) -> str:
     return f"{prefix}:{new_token()}"
 
 
+def new_revision_token() -> str:
+    """A short 6-digit optimistic-concurrency stamp for a page's status, e.g. `042917`."""
+    return f"{secrets.randbelow(1_000_000):06d}"
+
+
 # The type used for injected id factories in the pure core.
 IdFactory = Callable[[str], str]
+
+# The type used for injected status-revision factories in the store.
+RevisionFactory = Callable[[], str]
 
 
 def default_id_factory(prefix: str) -> str:
     """Prefixed id when `prefix` is non-empty (pages), else a bare token (list elements)."""
     return new_id(prefix) if prefix else new_token()
+
+
+def default_revision_factory() -> str:
+    return new_revision_token()
