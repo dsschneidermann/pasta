@@ -27,7 +27,7 @@ def _counter():
 def test_command_arg_schema_has_required_and_enum():
     set_kind = FIELDS.command("setKind")
     schema = command_arg_schema(set_kind)
-    assert schema["required"] == ["kind"]
+    assert schema["required"] == ["statusRevisionToken", "kind"]
     assert schema["properties"]["kind"]["enum"] == list(FIELDS.command("setKind").args[0].choices)
     assert schema["additionalProperties"] is False
 
@@ -37,6 +37,15 @@ def test_command_arg_schema_optional_not_required():
     schema = command_arg_schema(add_item)
     assert "text" in schema["required"]
     assert "note" not in schema["required"]         # optional
+
+
+def test_command_arg_schema_lists_the_revision_token_first():
+    # The optimistic-concurrency stamp is presented inside args, ahead of a command's own arguments,
+    # so it reads as every command's first argument - a content command and a transition alike.
+    for command in (FIELDS.command("setKind"), FLOW.command("open")):
+        schema = command_arg_schema(command)
+        assert next(iter(schema["properties"])) == "statusRevisionToken"
+        assert schema["required"][0] == "statusRevisionToken"
 
 
 def test_describe_page_type_shape():

@@ -44,7 +44,8 @@ def _mutate(store, workspace_id, page_id, commands):
     mid-sequence is deliberately not expressible this way: the transition regenerates the token, so
     a later command's stamp is stale - such tests present tokens explicitly instead."""
     token = store.get_page(workspace_id, page_id).status_revision_token
-    stamped = [{**command, "statusRevisionToken": token} for command in commands]
+    stamped = [{**command, "args": {"statusRevisionToken": token, **(command.get("args") or {})}}
+               for command in commands]
     return store.mutate_page_batch(workspace_id, page_id, stamped)
 
 
@@ -1658,8 +1659,23 @@ def test_wrong_revision_token_aborts_and_writes_nothing(revstore):
     page = revstore.create_page(workspace.id, "test-fields", "P").page      # token "000001"
     with pytest.raises(ConflictError, match="does not match"):
         revstore.mutate_page_batch(workspace.id, page.id, [
-            {"command": "addItem", "args": {"text": "x"}, "statusRevisionToken": "wrong"}])
+            {"command": "addItem", "args": {"statusRevisionToken": "wrong", "text": "x"}}])
     assert revstore.get_page(workspace.id, page.id).sections["items"]["items"] == []
+
+
+def test_token_is_read_from_args_and_stripped_before_the_command(revstore):
+    workspace = revstore.create_workspace("demo")
+    page = revstore.create_page(workspace.id, "test-fields", "P").page      # token "000001"
+    token = page.status_revision_token
+    # The token rides inside args and is consumed by the store, so the command applies cleanly
+    # rather than the pure core rejecting an unknown argument.
+    after, _ = revstore.mutate_page_batch(workspace.id, page.id, [
+        {"command": "addItem", "args": {"statusRevisionToken": token, "text": "x"}}])
+    assert [item["text"] for item in after.sections["items"]["items"]] == ["x"]
+    # A token left in the old sibling position is no longer read, so it reads as a missing token.
+    with pytest.raises(ConflictError, match="does not match"):
+        revstore.mutate_page_batch(workspace.id, page.id, [
+            {"command": "addItem", "args": {"text": "y"}, "statusRevisionToken": token}])
 
 
 def test_missing_token_is_rejected_when_the_page_has_one(revstore):
@@ -1675,11 +1691,11 @@ def test_content_keeps_the_token_and_a_transition_regenerates_it(revstore):
     token = page.status_revision_token
     # a content command does not move the status, so it leaves the token unchanged
     after, _ = revstore.mutate_page_batch(workspace.id, page.id, [
-        {"command": "setSummary", "args": {"text": "s"}, "statusRevisionToken": token}])
+        {"command": "setSummary", "args": {"statusRevisionToken": token, "text": "s"}}])
     assert after.status_revision_token == token
     # a status transition regenerates the token to a fresh value
     opened, _ = revstore.mutate_page_batch(workspace.id, page.id, [
-        {"command": "open", "statusRevisionToken": token}])
+        {"command": "open", "args": {"statusRevisionToken": token}}])
     assert opened.status == "open"
     assert opened.status_revision_token != token and opened.status_revision_token.isdigit()
 
@@ -1692,8 +1708,8 @@ def test_a_command_after_a_transition_in_one_batch_is_rejected(revstore):
     token = page.status_revision_token
     with pytest.raises(ConflictError, match="command 1"):
         revstore.mutate_page_batch(workspace.id, page.id, [
-            {"command": "open", "statusRevisionToken": token},                              # transitions
-            {"command": "setSummary", "args": {"text": "s"}, "statusRevisionToken": token},  # stale now
+            {"command": "open", "args": {"statusRevisionToken": token}},                       # transitions
+            {"command": "setSummary", "args": {"statusRevisionToken": token, "text": "s"}},     # stale now
         ])
     assert revstore.get_page(workspace.id, page.id).status == "draft"       # all-or-nothing
 

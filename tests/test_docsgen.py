@@ -130,7 +130,7 @@ def test_generated_docs_carry_the_instruction_on_the_field_not_the_setter():
     for line in instruction.splitlines():
         assert line in docs                                   # still printed, from the Sections listing
     assert brief.command("setSummary").description == "set the summary"
-    assert "- `setSummary(text)` *(set_prose)* - set the summary" in docs
+    assert "- `setSummary(statusRevisionToken, text)` *(set_prose)* - set the summary" in docs
 
 
 def test_generated_docs_do_not_repeat_the_instruction_under_every_setter():

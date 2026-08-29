@@ -480,14 +480,14 @@ async def createPage(workspaceId: str, type: str, title: str, parentId: str | No
 async def mutatePageBatch(
     workspaceId: str, pageId: str, commands: list[dict[str, Any]]
 ) -> dict[str, Any]:
-    """Run an ordered batch of commands on a page as a single atomic commit (each `{command, args?,
-    statusRevisionToken}` decided against the state left by the previous). Every command must carry the
-    page's current `statusRevisionToken` - a short token read from getPage, the render* meta line, or a
-    prior write/nextActions echo. A status transition regenerates it, so at most one transition is
-    legal per batch and only as the final command: a command after a transition carries a now-stale
-    token. All-or-nothing: any rejection aborts the whole batch and nothing commits - the error names
-    the failing index and command. Echoes the new status, the current `statusRevisionToken`, and next
-    actions."""
+    """Run an ordered batch of commands on a page as a single atomic commit (each `{command, args}`
+    decided against the state left by the previous). Every command must carry the page's current
+    `statusRevisionToken` as the first entry in its `args` - a short token read from getPage, the
+    render* meta line, or a prior write/nextActions echo. A status transition regenerates it, so at
+    most one transition is legal per batch and only as the final command: a command after a transition
+    carries a now-stale token. All-or-nothing: any rejection aborts the whole batch and nothing commits
+    - the error names the failing index and command. Echoes the new status, the current
+    `statusRevisionToken`, and next actions."""
     with _guard_tool():
         page, created = STORE.mutate_page_batch(workspaceId, pageId, commands)
         page_type = get_page_type(page.type)

@@ -39,8 +39,9 @@ def _mutate(mcp, args):
     serialized page, so the token is under its snake_case key."""
     page = call(mcp, "getPage", {"workspaceId": args["workspaceId"], "pageId": args["pageId"]})
     token = page["status_revision_token"]
-    stamped = {**args, "commands": [{**command, "statusRevisionToken": token}
-                                    for command in args["commands"]]}
+    stamped = {**args, "commands": [
+        {**command, "args": {"statusRevisionToken": token, **(command.get("args") or {})}}
+        for command in args["commands"]]}
     return call(mcp, "mutatePageBatch", stamped)
 
 
@@ -353,5 +354,5 @@ def test_status_revision_surfaced_and_echoed_via_server(mcp):
     # A wrong token surfaces as a ToolError rather than mutating.
     with pytest.raises(ToolError, match="does not match"):
         call(mcp, "mutatePageBatch", {"workspaceId": wid, "pageId": created["id"],
-                                      "commands": [{"command": "close", "args": {"sha": "a", "message": "m"},
-                                                    "statusRevisionToken": "nope"}]})
+                                      "commands": [{"command": "close",
+                                                    "args": {"statusRevisionToken": "nope", "sha": "a", "message": "m"}}]})

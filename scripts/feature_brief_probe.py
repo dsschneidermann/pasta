@@ -135,11 +135,12 @@ class Probe:
     def mutate(self, page_id: str, *commands: dict[str, Any]) -> list[str]:
         """Run a batch on one page and return the ids it created, in order, nulls dropped.
 
-        Reads the page's current status_revision_token and stamps it onto every command, which the
-        server requires on each."""
+        Reads the page's current status_revision_token and stamps it as the first entry in each
+        command's args, which the server requires on each."""
         token = self.call("getPage", workspaceId=self.workspace_id,
                           pageId=page_id)["status_revision_token"]
-        stamped = [{**command, "statusRevisionToken": token} for command in commands]
+        stamped = [{**command, "args": {"statusRevisionToken": token, **command.get("args", {})}}
+                   for command in commands]
         result = self.call("mutatePageBatch", workspaceId=self.workspace_id,
                            pageId=page_id, commands=stamped)
         return [created for created in result.get("createdIds", []) if created]

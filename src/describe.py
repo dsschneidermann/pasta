@@ -33,10 +33,19 @@ def _block_schema(block_kinds: tuple[BlockKindSpec, ...]) -> dict[str, Any]:
     return {"oneOf": branches}
 
 
+_REVISION_TOKEN_ARG = {
+    "type": "string",
+    "description": "the page's current status_revision_token; a status transition regenerates it, so a "
+                   "batch holds at most one transition and only as its final command",
+}
+
+
 def command_arg_schema(command: CommandSpec) -> dict[str, Any]:
-    """A JSON Schema object for a command's arguments."""
-    properties: dict[str, Any] = {}
-    required: list[str] = []
+    """A JSON Schema object for a command's arguments. Every command carries the page's
+    status_revision_token as its first argument - the optimistic-concurrency stamp the store reads
+    and strips before the pure core sees the remaining arguments."""
+    properties: dict[str, Any] = {"statusRevisionToken": dict(_REVISION_TOKEN_ARG)}
+    required: list[str] = ["statusRevisionToken"]
     for arg in command.args:
         prop: dict[str, Any] = {"type": arg.type}
         if arg.content == BLOCK_ARRAY and arg.block_kinds is not None:
