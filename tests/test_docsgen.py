@@ -27,6 +27,15 @@ from src.statecharts import page_machine_qualname
 # those tests - and the registry-wide coverage/qualname tests - must track production.
 
 
+@pytest.fixture(autouse=True)
+def _production_mode():
+    # Doc generation runs against the production registry, so this whole module runs with test mode
+    # off. Restored afterwards so the setting does not leak into later test modules.
+    pagetypes.set_test_mode(False)
+    yield
+    pagetypes.set_test_mode(True)
+
+
 def _counter():
     state = {"n": 0}
 
@@ -74,7 +83,6 @@ def test_ignore_requirements_does_not_bypass_legal_in_lock():
 
 # --- page_machine_qualname ---------------------------------------------------
 def test_page_machine_qualname_resolves_for_every_registered_type():
-    pagetypes.set_test_mode(False)
     for tag, page_type in REGISTRY.items():
         qualname = page_machine_qualname(tag)
         module_path, _, name = qualname.rpartition(".")
@@ -90,7 +98,6 @@ def test_page_machine_qualname_unknown_tag_raises():
 
 # --- registry-wide coverage + index ------------------------------------------
 def test_all_state_docs_covers_every_reachable_state():
-    pagetypes.set_test_mode(False)
     expected = {
         f"{tag}-{state}"
         for tag, page_type in REGISTRY.items()
@@ -115,14 +122,12 @@ def test_no_dead_overview_link_in_state_pages():
 
 def test_all_state_docs_is_idempotent():
     # Doc generation is pure over the registry: regenerating yields byte-identical output.
-    pagetypes.set_test_mode(False)
     assert all_state_docs() == all_state_docs()
 
 
 def test_generated_docs_carry_the_instruction_on_the_field_not_the_setter():
     # The instruction reaches the docs through the field line (rendered as an indented block, so it
     # arrives line by line); the setter's own line is the short description.
-    pagetypes.set_test_mode(False)
     brief = get_page_type("feature-brief")
     instruction = brief.field_spec("summary", "body").description
     assert instruction and "\n" in instruction                # a wrapped multi-line authoring instruction
@@ -136,7 +141,6 @@ def test_generated_docs_carry_the_instruction_on_the_field_not_the_setter():
 def test_generated_docs_do_not_repeat_the_instruction_under_every_setter():
     # The instruction's first line appears at most once per document (the Sections listing), where it
     # used to appear again under Commands and under Authoring commands.
-    pagetypes.set_test_mode(False)
     brief = get_page_type("feature-brief")
     first_line = brief.field_spec("summary", "body").description.splitlines()[0]
     for doc in all_state_docs().values():
@@ -147,7 +151,6 @@ def test_generated_docs_do_not_repeat_the_instruction_under_every_setter():
 # --- per-state guidance on the generated page --------------------------------
 def test_state_page_opens_with_its_state_guidance():
     # The text an agent gets on entering a state is the text a human reads on its page.
-    pagetypes.set_test_mode(False)
     guidance = get_page_type("feature-brief").fsm.guidance_for("review")
     assert guidance                                        # one of the documented states
     docs = state_docs(get_page_type("feature-brief"))
@@ -158,7 +161,6 @@ def test_state_page_opens_with_its_state_guidance():
 
 def test_state_page_without_guidance_keeps_the_placeholder():
     # Pins the narrow scope: a sibling state, and a type with no guidance at all.
-    pagetypes.set_test_mode(False)
     brief = state_docs(get_page_type("feature-brief"))
     assert "The `draft` state of the `feature-brief` page type." in brief["feature-brief-draft"]
     document = state_docs(get_page_type("document"))

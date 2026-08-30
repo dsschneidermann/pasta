@@ -58,6 +58,7 @@ class Workspace:
     pages: dict[str, Page] = field(default_factory=dict)
     created_at: str = ""
     updated_at: str = ""
+    guidance_config: dict[str, str] = field(default_factory=dict)
 
     def get_page(self, page_id: str) -> Page | None:
         return self.pages.get(page_id)

@@ -3,10 +3,17 @@
 from __future__ import annotations
 
 from ._stage_guidance import REVIEW, SIMPLE_CHANGE_DRAFT, SIMPLE_CHANGE_OPEN
+from ._workspace_guidance import (
+    MERGE_PROCESS_DESC,
+    MERGE_PROCESS_FIELD,
+    TESTING_TOOL_DESC,
+    TESTING_TOOL_FIELD,
+)
 from . import (
     FSMSpec,
     PageType,
     SectionSpec,
+    WorkspaceGuidanceSpec,
     _list,
     _prose,
     _scalar,
@@ -73,6 +80,10 @@ _SIMPLE_CHANGE = PageType(
                 once its sha has left history, for example after a rebase.
                 """),
         )),
+    ),
+    workspace_guidance=(
+        WorkspaceGuidanceSpec(MERGE_PROCESS_FIELD, ("review", "done"), MERGE_PROCESS_DESC),
+        WorkspaceGuidanceSpec(TESTING_TOOL_FIELD, ("open",), TESTING_TOOL_DESC),
     ),
     commands=(
         set_scalar_cmd("change", "component"),

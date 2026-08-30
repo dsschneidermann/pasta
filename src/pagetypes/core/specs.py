@@ -189,3 +189,18 @@ class AutoChildSpec:
     lives here, on the parent type, and is never stored as a field on the child Page.
     """
     type: str
+
+
+@dataclass(frozen=True)
+class WorkspaceGuidanceSpec:
+    """A per-workspace, mutable guidance text a page type surfaces at some of its statuses.
+
+    `field` names the text and keys its stored value; it must be non-empty. `guidance_for` is a
+    non-empty set of the declaring type's own statuses at which the text shows, tested by
+    membership. `description`, non-empty, says what the field means and must match across any types
+    that share the field. Construction does not validate; these rules are checked when the registry
+    is validated at load.
+    """
+    field: str
+    guidance_for: tuple[str, ...]
+    description: str

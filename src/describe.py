@@ -133,6 +133,11 @@ def describe_page_type(page_type: PageType) -> dict[str, Any]:
             }
             for section in page_type.sections
         ],
+        "workspaceGuidance": [
+            {"field": spec.field, "guidanceFor": list(spec.guidance_for),
+             "description": spec.description}
+            for spec in page_type.workspace_guidance
+        ],
         "commands": [_command_summary(command) for command in page_type.commands],
     }
 

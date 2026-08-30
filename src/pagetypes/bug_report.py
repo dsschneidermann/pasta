@@ -3,10 +3,17 @@
 from __future__ import annotations
 
 from ._stage_guidance import BUG_REPORT_DRAFT, BUG_REPORT_OPEN, REVIEW
+from ._workspace_guidance import (
+    MERGE_PROCESS_DESC,
+    MERGE_PROCESS_FIELD,
+    TESTING_TOOL_DESC,
+    TESTING_TOOL_FIELD,
+)
 from . import (
     FSMSpec,
     PageType,
     SectionSpec,
+    WorkspaceGuidanceSpec,
     _list,
     _prose,
     _scalar,
@@ -83,6 +90,10 @@ _BUG_REPORT = PageType(
                 actually lands the fix, not the intermediate work that led to it.
                 """),
         )),
+    ),
+    workspace_guidance=(
+        WorkspaceGuidanceSpec(MERGE_PROCESS_FIELD, ("review", "done"), MERGE_PROCESS_DESC),
+        WorkspaceGuidanceSpec(TESTING_TOOL_FIELD, ("open",), TESTING_TOOL_DESC),
     ),
     commands=(
         set_scalar_cmd("report", "component"),

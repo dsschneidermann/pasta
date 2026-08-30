@@ -24,6 +24,7 @@ from .specs import (
     TRANSITION,
     AutoChildSpec,
     FSMSpec,
+    WorkspaceGuidanceSpec,
 )
 
 
@@ -37,6 +38,8 @@ class PageType:
     fsm: FSMSpec
     # auto-created pinned children created in the same commit as this page (see AutoChildSpec)
     auto_children: tuple[AutoChildSpec, ...] = ()
+    # mutable per-workspace guidance texts this type surfaces at some of its statuses
+    workspace_guidance: tuple[WorkspaceGuidanceSpec, ...] = ()
 
     def __post_init__(self):
         self._resolve_block_vocabularies()

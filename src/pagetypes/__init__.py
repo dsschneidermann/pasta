@@ -51,6 +51,7 @@ from .core.specs import (
     FSMSpec,
     ParentStateGuard,
     RefCheck,
+    WorkspaceGuidanceSpec,
 )
 from .core.args import (
     ArgSpec,
@@ -126,6 +127,7 @@ from .core.validation import (
     validate_pagetype_field_setters,
     validate_pagetype_setter_descriptions,
     validate_table,
+    validate_workspace_guidance,
 )
 
 # The package's exports, private helpers included: the page-type modules reach their
@@ -169,6 +171,7 @@ __all__ = [
     "TABLE_ALIGN",
     "TITLE_ELEMENT_FIELDS",
     "TRANSITION",
+    "WorkspaceGuidanceSpec",
     "_ALIGN_VALUES",
     "_INDEX",
     "_MARKDOWN_TOKENS",
@@ -230,6 +233,8 @@ __all__ = [
     "validate_pagetype_setter_descriptions",
     "validate_registry",
     "validate_table",
+    "validate_workspace_guidance",
+    "workspace_guidance_fields",
 ]
 
 # --- The page types ----------------------------------------------------------
@@ -376,3 +381,15 @@ def discoverable_registry() -> dict[str, PageType]:
 def is_auto_child_type(parent_type: PageType | None, child_type: str) -> bool:
     """Whether `child_type` is an auto-created (pinned, protected) child of `parent_type`."""
     return parent_type is not None and any(spec.type == child_type for spec in parent_type.auto_children)
+
+
+def workspace_guidance_fields() -> dict[str, WorkspaceGuidanceSpec]:
+    """Every declared workspace-guidance field mapped to a representative spec (the first to declare
+    it) - the fields a workspace may configure. Reads the production registry, or the test fixtures
+    under test mode, so a fixture's field is never offered in production."""
+    registry = _test_registry() if _test_mode else REGISTRY
+    fields: dict[str, WorkspaceGuidanceSpec] = {}
+    for page_type in registry.values():
+        for spec in page_type.workspace_guidance:
+            fields.setdefault(spec.field, spec)
+    return fields

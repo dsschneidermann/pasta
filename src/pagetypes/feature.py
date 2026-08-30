@@ -14,6 +14,12 @@ from ._stage_guidance import (
     PLAN_REVIEW,
     SPEC,
 )
+from ._workspace_guidance import (
+    MERGE_PROCESS_DESC,
+    MERGE_PROCESS_FIELD,
+    TESTING_TOOL_DESC,
+    TESTING_TOOL_FIELD,
+)
 from . import (
     AutoChildSpec,
     ChildStateGuard,
@@ -24,6 +30,7 @@ from . import (
     ParentStateGuard,
     RefCheck,
     SectionSpec,
+    WorkspaceGuidanceSpec,
     _blocks,
     _boolean,
     _code_block,
@@ -185,6 +192,10 @@ _FEATURE_BRIEF = PageType(
                 stale once its sha has left history, for example after a rebase.
                 """),
         )),
+    ),
+    workspace_guidance=(
+        WorkspaceGuidanceSpec(MERGE_PROCESS_FIELD, ("review",), MERGE_PROCESS_DESC),
+        WorkspaceGuidanceSpec(TESTING_TOOL_FIELD, ("building",), TESTING_TOOL_DESC),
     ),
     commands=(
         set_prose_cmd("summary"),

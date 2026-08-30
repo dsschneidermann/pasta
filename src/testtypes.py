@@ -66,6 +66,7 @@ from .pagetypes import (
     ParentStateGuard,
     RefCheck,
     SectionSpec,
+    WorkspaceGuidanceSpec,
     _blocks,
     _boolean,
     _code_block,
@@ -332,6 +333,13 @@ TEST_LIFECYCLE = PageType(
     ),
     # On createPage, create the pinned child in the same commit; author into it.
     auto_children=(AutoChildSpec("test-child"),),
+    # Workspace-guidance fields for the tests: one shown across two states, one at a single state,
+    # and one at the initial state.
+    workspace_guidance=(
+        WorkspaceGuidanceSpec("buildTool", ("building", "review"), "the build tool this workspace uses"),
+        WorkspaceGuidanceSpec("reviewHint", ("review",), "a hint shown while reviewing"),
+        WorkspaceGuidanceSpec("draftHint", ("draft",), "a hint shown while drafting"),
+    ),
 )
 
 

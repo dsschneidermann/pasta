@@ -10,7 +10,6 @@ production). This file owns only the seam and the membership of the set.
 
 import pytest
 
-from src.docsgen import all_state_docs, render_states_index
 from src.pagetypes import (
     discoverable_registry,
     expose_test_types,
@@ -52,14 +51,6 @@ def test_fixtures_resolve_regardless_of_flag():
 def test_listing_hides_fixtures_by_default():
     assert not any(tag.startswith("test-") for tag in registered_tags())
     assert not any(tag.startswith("test-") for tag in discoverable_registry())
-
-
-def test_docgen_excludes_fixtures_by_default():
-    stems = set(all_state_docs())
-    assert stems, "expected some generated state docs"
-    assert not any(stem.startswith("test-") for stem in stems)
-    index = render_states_index()
-    assert not any(line.strip().startswith("test-") for line in index.splitlines())
 
 
 # --- the flag reveals discovery, and always restores -------------------------

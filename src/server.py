@@ -473,6 +473,7 @@ async def createPage(workspaceId: str, type: str, title: str, parentId: str | No
         guidance = page_type.fsm.guidance_for(page.status) if page_type is not None else None
         if guidance is not None:
             response["guidance"] = guidance
+        response.update(STORE.page_workspace_guidance(workspaceId, page))
         return response
 
 
@@ -501,12 +502,29 @@ async def mutatePageBatch(
             "createdIds": created,
             "next": next_actions,
         }
-        # Sits beside `next`, never inside it: nextActions carries no guidance.
+        # The stage guidance for a state just entered, beside `next`.
         guidance = (transition_guidance(page_type, commands, page.status)
                     if page_type is not None else None)
         if guidance is not None:
             response["guidance"] = guidance
+        response.update(STORE.page_workspace_guidance(workspaceId, page))
         return response
+
+
+# --- Workspace guidance configuration ----------------------------------------
+@mcp.tool
+async def setWorkspaceGuidance(workspaceId: str, field: str, text: str) -> dict[str, Any]:
+    """Set the workspace's stored guidance text for a configurable guidance field.
+
+    An unknown field is rejected, listing the ones that are declared. `text` is a single string,
+    and an empty string clears the field. Once set, the text is surfaced to pages that declare the
+    field while they sit at one of its statuses. Returns the workspace id, the field, and the config.
+    """
+    with _guard_tool():
+        workspace = STORE.set_workspace_guidance(workspaceId, field, text)
+        await ws_reloader.refresh()
+        return {"workspaceId": workspace.id, "field": field,
+                "guidanceConfig": dict(workspace.guidance_config)}
 
 
 # --- Archiving ---------------------------------------------------------------

@@ -334,6 +334,33 @@ def validate_page_type(page_type: PageType) -> list[str]:
     return [f"{page_type.tag}: {error}" for error in errors]
 
 
+def validate_workspace_guidance(registry: Mapping[str, PageType]) -> list[str]:
+    """Validate the workspace-guidance declarations across the registry, collecting the errors."""
+    errors: list[str] = []
+    descriptions: dict[str, tuple[str, str]] = {}   # field -> (description, first tag to declare it)
+    for tag, page_type in registry.items():
+        states = set(page_type.fsm.states)
+        for spec in page_type.workspace_guidance:
+            if not spec.field:
+                errors.append(f"{tag}: a workspace guidance declares an empty field name.")
+            if not spec.guidance_for:
+                errors.append(
+                    f"{tag}: workspace guidance '{spec.field}' declares no guidance_for statuses.")
+            for status in spec.guidance_for:
+                if status not in states:
+                    errors.append(
+                        f"{tag}: workspace guidance '{spec.field}' names unknown status '{status}'.")
+            if not spec.description:
+                errors.append(f"{tag}: workspace guidance '{spec.field}' has an empty description.")
+            prior = descriptions.get(spec.field)
+            if prior is None:
+                descriptions[spec.field] = (spec.description, tag)
+            elif prior[0] != spec.description:
+                errors.append(
+                    f"{tag}: workspace guidance '{spec.field}' description disagrees with '{prior[1]}'.")
+    return errors
+
+
 def validate_page_types(registry: Mapping[str, PageType]) -> None:
     """Validate every page type in `registry` in one pass, collecting all errors.
 
@@ -344,6 +371,7 @@ def validate_page_types(registry: Mapping[str, PageType]) -> None:
     errors: list[str] = []
     for page_type in registry.values():
         errors.extend(validate_page_type(page_type))
+    errors.extend(validate_workspace_guidance(registry))
     if errors:
         raise ValueError(
             "Invalid page-type declarations:\n" + "\n".join(f"- {error}" for error in errors))
