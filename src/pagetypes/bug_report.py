@@ -9,24 +9,18 @@ from ._workspace_guidance import (
     TESTING_TOOL_DESC,
     TESTING_TOOL_FIELD,
 )
-from . import (
-    FSMSpec,
-    PageType,
-    SectionSpec,
-    WorkspaceGuidanceSpec,
-    _list,
-    _prose,
-    _scalar,
-    _text,
-    add_link_cmd,
+from .core.specs import FSMSpec, WorkspaceGuidanceSpec
+from .core.args import _text, add_link_cmd, set_title_cmd
+from .core.fields import SectionSpec, _list, _prose, _scalar
+from .core.commands import (
     list_cmds,
     set_element_field_cmd,
     set_prose_cmd,
     set_scalar_cmd,
-    set_title_cmd,
     transition_cmd,
     transition_on_add_cmd,
 )
+from .core.pagetype import PageType
 
 _COMMIT_LOG_STATES = ("open", "review", "done", "closed")
 

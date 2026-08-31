@@ -31,16 +31,11 @@ from . import cleanup, commands, fsm, render, render_html
 from .errors import ConflictError, PastaError, IllegalCommandError, NotFoundError, ValidationError
 from .ids import IdFactory, RevisionFactory, default_id_factory, default_revision_factory, new_id
 from .model import Page, Workspace
-from .pagetypes import (
-    ADD_LINK,
-    BLOCK_ARRAY,
-    COMPOUND,
-    LIST,
-    TRANSITION,
-    CommandSpec,
-    PageType,
-    RefCheck,
-    collect_ref_ids,
+from .pagetypes.core.specs import ADD_LINK, BLOCK_ARRAY, COMPOUND, LIST, TRANSITION, RefCheck
+from .pagetypes.core.args import CommandSpec
+from .pagetypes.core.pagetype import PageType
+from .pagetypes.core.validation import collect_ref_ids
+from .pagetypes._registry import (
     get_page_type,
     is_auto_child_type,
     registered_tags,

@@ -9,7 +9,10 @@ from dataclasses import dataclass
 from typing import Any
 
 from .model import Page, Workspace
-from .pagetypes import BLOCKS, LIST, PROSE, SCALAR, ElementFSMSpec, FieldSpec, PageType, get_page_type
+from .pagetypes.core.specs import BLOCKS, LIST, PROSE, SCALAR, ElementFSMSpec
+from .pagetypes.core.fields import FieldSpec
+from .pagetypes.core.pagetype import PageType
+from .pagetypes._registry import get_page_type
 
 
 # --- plain-text escaping (web render only) -----------------------------------

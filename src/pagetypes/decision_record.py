@@ -3,25 +3,11 @@
 from __future__ import annotations
 
 from ._stage_guidance import DECISION_RECORD_AUTHORING
-from . import (
-    FSMSpec,
-    PageType,
-    SectionSpec,
-    _blocks,
-    _code_block,
-    _list,
-    _prose,
-    _scalar,
-    _text,
-    _paragraph_text,
-    add_link_cmd,
-    blocks_cmds,
-    list_cmds,
-    set_prose_cmd,
-    set_scalar_cmd,
-    set_title_cmd,
-    transition_cmd,
-)
+from .core.specs import FSMSpec
+from .core.args import _code_block, _text, _paragraph_text, add_link_cmd, set_title_cmd
+from .core.fields import SectionSpec, _blocks, _list, _prose, _scalar
+from .core.commands import blocks_cmds, list_cmds, set_prose_cmd, set_scalar_cmd, transition_cmd
+from .core.pagetype import PageType
 
 _DECISION_RECORD = PageType(
     tag="decision-record",

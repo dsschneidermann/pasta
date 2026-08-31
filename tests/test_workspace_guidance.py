@@ -14,16 +14,11 @@ from fastmcp.exceptions import ToolError
 import src.server as server
 from src.errors import ValidationError
 from src.model import Workspace
-from src.pagetypes import (
-    FSMSpec,
-    PageType,
-    SectionSpec,
-    WorkspaceGuidanceSpec,
-    get_page_type,
-    validate_page_types,
-    validate_workspace_guidance,
-    workspace_guidance_fields,
-)
+from src.pagetypes.core.specs import FSMSpec, WorkspaceGuidanceSpec
+from src.pagetypes.core.fields import SectionSpec
+from src.pagetypes.core.pagetype import PageType
+from src.pagetypes.core.validation import validate_page_types, validate_workspace_guidance
+from src.pagetypes._registry import get_page_type, workspace_guidance_fields
 from src.serialize import workspace_from_dict, workspace_to_dict
 from src.store import Store, workspace_guidance_for
 from src.describe import describe_page_type

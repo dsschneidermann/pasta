@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from . import FSMSpec, PageType
+from .core.specs import FSMSpec
+from .core.pagetype import PageType
 
 _TOC = PageType(
     tag="toc",

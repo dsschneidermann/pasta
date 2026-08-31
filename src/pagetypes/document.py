@@ -2,16 +2,11 @@
 
 from __future__ import annotations
 
-from . import (
-    FSMSpec,
-    PageType,
-    SectionSpec,
-    _blocks,
-    add_link_cmd,
-    blocks_cmds,
-    set_title_cmd,
-    standard_blocks,
-)
+from .core.specs import FSMSpec
+from .core.args import add_link_cmd, set_title_cmd, standard_blocks
+from .core.fields import SectionSpec, _blocks
+from .core.commands import blocks_cmds
+from .core.pagetype import PageType
 
 _DOCUMENT = PageType(
     tag="document",

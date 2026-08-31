@@ -55,28 +55,36 @@ and cache identity never collide with production.
 
 from __future__ import annotations
 
-from .pagetypes import (
+from .pagetypes.core.specs import (
     AutoChildSpec,
-    BlockKindSpec,
     ChildStateGuard,
-    ElementBlocksSpec,
     ElementFSMSpec,
     FSMSpec,
-    PageType,
     ParentStateGuard,
     RefCheck,
-    SectionSpec,
     WorkspaceGuidanceSpec,
-    _blocks,
+)
+from .pagetypes.core.args import (
+    BlockKindSpec,
+    ElementBlocksSpec,
     _boolean,
     _code_block,
-    _list,
     _list_block,
     _paragraph_runs,
     _paragraph_text,
+    _text,
+    add_link_cmd,
+    set_title_cmd,
+    standard_blocks,
+)
+from .pagetypes.core.fields import (
+    SectionSpec,
+    _blocks,
+    _list,
     _prose,
     _scalar,
-    _text,
+)
+from .pagetypes.core.commands import (
     blocks_cmds,
     element_blocks_cmds,
     element_cmds,
@@ -86,10 +94,8 @@ from .pagetypes import (
     set_scalar_cmd,
     transition_cmd,
     transition_on_add_cmd,
-    add_link_cmd,
-    set_title_cmd,
-    standard_blocks,
 )
+from .pagetypes.core.pagetype import PageType
 
 
 # --- Element-level FSMs (a list element's own tiny lifecycle) -----------------

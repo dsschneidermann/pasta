@@ -1,5 +1,5 @@
 """The machinery every page type draws on, grouped by what it is.
 
-Nothing is re-exported here: the parent package's init module is the single table
-of contents, and a second one would be a second list to keep in step.
+Nothing is re-exported here: consumers import from the concrete submodules directly,
+so this init stays empty and there is no export list to keep in step.
 """

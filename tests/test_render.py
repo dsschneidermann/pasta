@@ -7,7 +7,9 @@ from wenmode.presets import github
 from src.commands import apply_command, create_page
 from src.errors import ConflictError, ValidationError
 from src.model import Page
-from src.pagetypes import FSMSpec, PageType, get_page_type
+from src.pagetypes.core.specs import FSMSpec
+from src.pagetypes.core.pagetype import PageType
+from src.pagetypes._registry import get_page_type
 from src.render import (RefContext, checkbox_state, escape_markdown, page_text, render_page,
                             render_workspace_links)
 

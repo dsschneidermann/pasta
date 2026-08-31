@@ -16,7 +16,7 @@ from . import fsm
 from .errors import ConflictError, IllegalCommandError, NotFoundError, ValidationError
 from .ids import IdFactory
 from .model import Page
-from .pagetypes import (
+from .pagetypes.core.specs import (
     ADD_BLOCK,
     ADD_ELEMENT,
     ADD_LINK,
@@ -32,17 +32,13 @@ from .pagetypes import (
     SET_SCALAR,
     SET_TITLE,
     TRANSITION,
-    ArgSpec,
-    BlockKindSpec,
-    CommandSpec,
-    FieldSpec,
-    PageType,
-    guard_production_type,
-    initial_sections,
-    is_field_setter,
-    validate_blocks,
-    validate_inline_content,
 )
+from .pagetypes.core.args import ArgSpec, BlockKindSpec, CommandSpec
+from .pagetypes.core.fields import FieldSpec
+from .pagetypes.core.commands import is_field_setter
+from .pagetypes.core.validation import validate_blocks, validate_inline_content
+from .pagetypes.core.pagetype import PageType, initial_sections
+from .pagetypes._registry import guard_production_type
 
 _PYTHON_TYPE = {
     "string": str,

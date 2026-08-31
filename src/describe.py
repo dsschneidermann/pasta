@@ -11,8 +11,9 @@ from typing import Any
 
 from .commands import legal_commands
 from .model import Page
-from .pagetypes import (BLOCKS, BLOCK_ARRAY, COMPOUND, TRANSITION, BlockKindSpec, CommandSpec,
-                        PageType)
+from .pagetypes.core.specs import BLOCKS, BLOCK_ARRAY, COMPOUND, TRANSITION
+from .pagetypes.core.args import BlockKindSpec, CommandSpec
+from .pagetypes.core.pagetype import PageType
 
 
 def _block_schema(block_kinds: tuple[BlockKindSpec, ...]) -> dict[str, Any]:

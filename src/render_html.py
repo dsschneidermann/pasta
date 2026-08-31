@@ -17,7 +17,9 @@ from wenmode import Wenmode
 from wenmode.presets import github
 
 from .model import Page
-from .pagetypes import BLOCKS, LIST, PROSE, SCALAR, FieldSpec, PageType, SectionSpec
+from .pagetypes.core.specs import BLOCKS, LIST, PROSE, SCALAR
+from .pagetypes.core.fields import FieldSpec, SectionSpec
+from .pagetypes.core.pagetype import PageType
 from .render import RefContext, checkbox_state, render_blocks
 
 # The one Markdown-to-HTML engine, defined here because this is where HTML is produced.

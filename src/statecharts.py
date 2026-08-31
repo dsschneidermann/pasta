@@ -10,7 +10,7 @@ its page type because it is derived from the same ``FSMSpec`` in the registry.
 from __future__ import annotations
 
 from .fsm import machine_class
-from .pagetypes import get_page_type
+from .pagetypes._registry import get_page_type
 
 def _page_fsm(tag: str):
     page = get_page_type(tag)

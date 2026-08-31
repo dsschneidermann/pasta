@@ -3,25 +3,11 @@
 from __future__ import annotations
 
 from ._stage_guidance import ARCHITECTURE_AUTHORING
-from . import (
-    FSMSpec,
-    PageType,
-    SectionSpec,
-    _blocks,
-    _code_block,
-    _list,
-    _paragraph_runs,
-    _prose,
-    _scalar,
-    _text,
-    add_link_cmd,
-    blocks_cmds,
-    list_cmds,
-    set_prose_cmd,
-    set_scalar_cmd,
-    set_title_cmd,
-    transition_cmd,
-)
+from .core.specs import FSMSpec
+from .core.args import _code_block, _paragraph_runs, _text, add_link_cmd, set_title_cmd
+from .core.fields import SectionSpec, _blocks, _list, _prose, _scalar
+from .core.commands import blocks_cmds, list_cmds, set_prose_cmd, set_scalar_cmd, transition_cmd
+from .core.pagetype import PageType
 
 _NODE_KINDS = ("module", "component", "subsystem", "service", "layer", "package")
 _CODE_REF_KINDS = ("file", "function", "class", "type", "interface", "constant")

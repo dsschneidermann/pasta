@@ -13,7 +13,7 @@ import pytest
 
 from src.commands import is_field_setter
 from src.errors import ValidationError
-from src.pagetypes import (
+from src.pagetypes.core.specs import (
     ADD_BLOCK,
     ADD_ELEMENT,
     ADD_LINK,
@@ -36,45 +36,44 @@ from src.pagetypes import (
     BLOCK_ARRAY,
     LIST,
     PROSE,
-    REGISTRY,
+    FSMSpec,
+)
+from src.pagetypes.core.args import (
     BlockKindSpec,
-    ElementBlocksSpec,
-    set_prose_cmd,
-    SectionSpec,
-    PageType,
     CommandSpec,
-    FieldSpec,
+    ElementBlocksSpec,
     _array,
-    _blocks,
     _boolean,
     _code_block,
     _divider_block,
     _heading_runs,
+    _heading_text,
     _integer,
-    _list,
     _list_block,
     _paragraph_runs,
-    _prose,
+    _paragraph_text,
     _quote_block,
     _table_block,
     _text,
-    _heading_text,
-    _paragraph_text,
     standard_blocks,
+)
+from src.pagetypes.core.fields import FieldSpec, SectionSpec, _blocks, _list, _prose
+from src.pagetypes.core.commands import (
     blocks_cmds,
-    collect_ref_ids,
     element_blocks_cmds,
     list_cmds,
-    get_page_type,
-    initial_sections,
-    status_transitions,
+    set_prose_cmd,
+)
+from src.pagetypes.core.pagetype import PageType, initial_sections, status_transitions
+from src.pagetypes.core.validation import (
+    collect_ref_ids,
     validate_block,
     validate_blocks,
     validate_inline_content,
     validate_pagetype_field_setters,
     validate_table,
-    FSMSpec,
 )
+from src.pagetypes._registry import REGISTRY, get_page_type
 from src.pagetypes import _stage_guidance
 from src.pagetypes.core.validation import (
     validate_field_spec,
@@ -282,7 +281,9 @@ def test_every_add_command_supports_positioned_insert(tag: str):
 def test_list_cmds_threads_ref_check_onto_the_add_only():
     """Only the add carries the check: the remove and reorder name an element already on this
     page. `singular=` keeps the derived noun off the plural rule's 'dispatche'."""
-    from src.pagetypes import ArgSpec, RefCheck, list_cmds
+    from src.pagetypes.core.args import ArgSpec
+    from src.pagetypes.core.specs import RefCheck
+    from src.pagetypes.core.commands import list_cmds
     ref = RefCheck(arg="workstreamId", scope="parent", section="workstreams", field="items")
     add, remove, reorder = list_cmds("dispatches", singular="dispatch",
                                      add_args=(ArgSpec("workstreamId"),), ref_check=ref)
@@ -311,7 +312,10 @@ def test_field_setter_description_is_short_and_not_the_instruction(tag: str):
 def _drift_type(setter_description: str, field_description: str):
     """A one-setter page type whose setter and field descriptions are both caller-controlled, so a
     test can pick which branch of the field-setter validation fires."""
-    from src.pagetypes import CommandSpec, FSMSpec, PageType, SectionSpec, _prose, _text
+    from src.pagetypes.core.args import CommandSpec, _text
+    from src.pagetypes.core.specs import FSMSpec
+    from src.pagetypes.core.fields import SectionSpec, _prose
+    from src.pagetypes.core.pagetype import PageType
     return PageType(
         tag="xtest-drift", name="Drift", description="ad-hoc",
         sections=(SectionSpec("summary", "Summary",
@@ -339,7 +343,10 @@ def test_field_setter_repeating_a_single_line_field_instruction_is_rejected():
 
 def test_field_setter_targeting_an_unknown_field_is_still_rejected():
     # The pre-existing check must survive the guard rewrite it sat beside.
-    from src.pagetypes import CommandSpec, FSMSpec, PageType, SectionSpec, _prose, _text
+    from src.pagetypes.core.args import CommandSpec, _text
+    from src.pagetypes.core.specs import FSMSpec
+    from src.pagetypes.core.fields import SectionSpec, _prose
+    from src.pagetypes.core.pagetype import PageType
     ghost = PageType(
         tag="xtest-ghost", name="Ghost", description="ad-hoc",
         sections=(SectionSpec("summary", "Summary", (_prose("body", description="x"),)),),
@@ -425,7 +432,8 @@ def test_element_fsms_declare_checkmark_done():
 
 
 def test_auto_children_are_specs_and_pinned_detection():
-    from src.pagetypes import AutoChildSpec, is_auto_child_type
+    from src.pagetypes.core.specs import AutoChildSpec
+    from src.pagetypes._registry import is_auto_child_type
     # auto_children are AutoChildSpec instances naming the pinned child types (the test-child fixture)
     assert all(isinstance(spec, AutoChildSpec) for spec in LIFE.auto_children)
     assert {spec.type for spec in LIFE.auto_children} == {"test-child"}
@@ -577,20 +585,6 @@ def test_block_kind_helpers():
     assert [block.body_args() for block in standard_blocks()] == [
         _paragraph_runs().body_args(), _heading_runs().body_args(), _code_block().body_args(),
         _list_block().body_args(), _quote_block().body_args(), _table_block().body_args(), _divider_block().body_args()]
-
-
-def test_removed_block_names_are_gone_and_helpers_exported():
-    # The old table machinery is removed from the package, and the helpers that replace it are
-    # exported in its place - both the binding and the __all__ entry.
-    import src.pagetypes as pkg
-    for gone in ("BLOCK_ARGS", "STANDARD_BLOCK_KINDS", "_ALL_BLOCK_KINDS", "_as_block_kinds"):
-        assert not hasattr(pkg, gone)
-        assert gone not in pkg.__all__
-    for helper in ("_paragraph_runs", "_heading_runs", "_paragraph_text", "_heading_text",
-                   "_code_block", "_list_block", "_quote_block", "_table_block", "_divider_block",
-                   "standard_blocks"):
-        assert hasattr(pkg, helper)
-        assert helper in pkg.__all__
 
 
 def test_field_spec_block_kinds():
@@ -1043,5 +1037,5 @@ def test_validate_page_types_aggregates_every_defect_into_one_raise():
 
 def test_validate_registry_passes_over_the_production_registry():
     # The single entry point the primary flows call returns cleanly for the real registry.
-    from src.pagetypes import validate_registry
+    from src.pagetypes._registry import validate_registry
     assert validate_registry() is None

@@ -4,7 +4,8 @@ import pytest
 
 from src import fsm
 from src.errors import IllegalCommandError
-from src.pagetypes import FSMSpec, get_page_type
+from src.pagetypes.core.specs import FSMSpec
+from src.pagetypes._registry import get_page_type
 
 # Two hand-authored fixtures cover the FSM engine's cases: `test-child` is a simple 2-state cyclic
 # machine (draft <-> ready); `test-flow` is a 3-state cycle whose STATE `open` and EVENT `open`

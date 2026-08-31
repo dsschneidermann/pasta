@@ -20,29 +20,29 @@ from ._workspace_guidance import (
     TESTING_TOOL_DESC,
     TESTING_TOOL_FIELD,
 )
-from . import (
+from .core.specs import (
     AutoChildSpec,
     ChildStateGuard,
-    ElementBlocksSpec,
     ElementFSMSpec,
     FSMSpec,
-    PageType,
     ParentStateGuard,
     RefCheck,
-    SectionSpec,
     WorkspaceGuidanceSpec,
-    _blocks,
+)
+from .core.args import (
+    ElementBlocksSpec,
     _boolean,
     _code_block,
-    _list,
     _paragraph_runs,
-    _prose,
-    _scalar,
     _text,
     _heading_text,
     _paragraph_text,
     BlockKindSpec,
     add_link_cmd,
+    set_title_cmd,
+)
+from .core.fields import SectionSpec, _blocks, _list, _prose, _scalar
+from .core.commands import (
     blocks_cmds,
     element_blocks_cmds,
     element_cmds,
@@ -50,9 +50,9 @@ from . import (
     set_element_field_cmd,
     set_prose_cmd,
     set_scalar_cmd,
-    set_title_cmd,
     transition_cmd,
 )
+from .core.pagetype import PageType
 
 _STEP_FSM = ElementFSMSpec(
     name="Step",

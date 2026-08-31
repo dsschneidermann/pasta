@@ -1,6 +1,6 @@
 """Pytest configuration for the pasta suite: put the whole run in *test mode*.
 
-Test mode (``src.pagetypes.set_test_mode``) makes the PRODUCTION page types off-limits: they do
+Test mode (``src.pagetypes._registry.set_test_mode``) makes the PRODUCTION page types off-limits: they do
 not resolve (``get_page_type``), are not listed (``registered_tags`` / ``discoverable_registry`` -
 hence the ``describePageType`` listing and doc-gen enumeration), and a page of one cannot be created.
 Any attempt raises ``ProductionTypeInTestError``, steering the author to exercise new capabilities on
@@ -17,13 +17,13 @@ succeeds and the guard then yields clean per-test failures instead of a collecti
 
 import pytest
 
-from src import pagetypes
+from src.pagetypes._registry import set_test_mode
 
 
 @pytest.fixture(autouse=True, scope="session")
 def _forbid_production_types_in_tests():
-    pagetypes.set_test_mode(True)
+    set_test_mode(True)
     try:
         yield
     finally:
-        pagetypes.set_test_mode(False)
+        set_test_mode(False)

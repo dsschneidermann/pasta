@@ -6,30 +6,25 @@ on their own, and reading one without the other would hide the coupling.
 
 from __future__ import annotations
 
-from . import (
+from .core.specs import (
     AutoChildSpec,
     ChildStateGuard,
     ElementFSMSpec,
     FSMSpec,
-    PageType,
     ParentStateGuard,
     RefCheck,
-    SectionSpec,
-    _boolean,
-    _integer,
-    _list,
-    _prose,
-    _scalar,
-    _text,
-    add_link_cmd,
+)
+from .core.args import _boolean, _integer, _text, add_link_cmd, set_title_cmd
+from .core.fields import SectionSpec, _list, _prose, _scalar
+from .core.commands import (
     element_cmds,
     list_cmds,
     set_element_field_cmd,
     set_prose_cmd,
     set_scalar_cmd,
-    set_title_cmd,
     transition_cmd,
 )
+from .core.pagetype import PageType
 
 _QUESTION_FSM = ElementFSMSpec(
     name="Question",

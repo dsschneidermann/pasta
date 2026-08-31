@@ -5,7 +5,7 @@ import importlib
 import pytest
 
 from src import statecharts
-from src import pagetypes
+from src.pagetypes._registry import set_test_mode
 from src.commands import create_page, legal_commands
 from src.docsgen import (
     _bullet,
@@ -16,7 +16,7 @@ from src.docsgen import (
     render_states_index,
     state_docs,
 )
-from src.pagetypes import REGISTRY, get_page_type
+from src.pagetypes._registry import REGISTRY, get_page_type
 from src.statecharts import page_machine_qualname
 
 # Migration note: the PURE FSM-analysis tests below (reachable_states, ignore_requirements) pin to
@@ -31,9 +31,9 @@ from src.statecharts import page_machine_qualname
 def _production_mode():
     # Doc generation runs against the production registry, so this whole module runs with test mode
     # off. Restored afterwards so the setting does not leak into later test modules.
-    pagetypes.set_test_mode(False)
+    set_test_mode(False)
     yield
-    pagetypes.set_test_mode(True)
+    set_test_mode(True)
 
 
 def _counter():

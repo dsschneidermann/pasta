@@ -10,7 +10,7 @@ production). This file owns only the seam and the membership of the set.
 
 import pytest
 
-from src.pagetypes import (
+from src.pagetypes._registry import (
     discoverable_registry,
     expose_test_types,
     get_page_type,

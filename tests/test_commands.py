@@ -14,27 +14,19 @@ from src.commands import (
 )
 from src.errors import ConflictError, IllegalCommandError, NotFoundError, ValidationError
 from src.model import Page
-from src.pagetypes import (
-    FSMSpec,
-    PageType,
+from src.pagetypes.core.specs import FSMSpec
+from src.pagetypes.core.args import (
     ElementBlocksSpec,
-    SectionSpec,
-    _blocks,
-    _list,
-    _prose,
     _table_block,
     _text,
     add_link_cmd,
-    blocks_cmds,
-    get_page_type,
-    initial_sections,
-    blocks_cmds,
-    list_cmds,
-    set_prose_cmd,
     set_title_cmd,
     standard_blocks,
-    transition_cmd,
 )
+from src.pagetypes.core.fields import SectionSpec, _blocks, _list, _prose
+from src.pagetypes.core.commands import blocks_cmds, list_cmds, set_prose_cmd, transition_cmd
+from src.pagetypes.core.pagetype import PageType, initial_sections
+from src.pagetypes._registry import get_page_type
 
 # Hand-authored capability fixtures (src.testtypes) - purpose-built so enriching a production
 # type never churns these command-surface assertions.

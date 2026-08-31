@@ -41,7 +41,7 @@ class ConflictError(PastaError):
 class ProductionTypeInTestError(PastaError):
     """A test touched a production page type while in test mode.
 
-    Production page types are off-limits to the test suite (see `src.pagetypes.set_test_mode`):
+    Production page types are off-limits to the test suite (see `src.pagetypes._registry.set_test_mode`):
     they do not resolve, are not listed, and cannot be instantiated. Tests must exercise page-type
     capabilities on the hand-authored `test-*` fixtures (`src.testtypes`), never on production
     types.

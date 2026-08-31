@@ -27,7 +27,7 @@ from .commands import transition_guidance
 from .describe import describe_mutations, describe_page_type
 from .errors import PastaError
 from .hmr_live_refresh import ws_reloader
-from .pagetypes import get_page_type, registered_tags, validate_registry
+from .pagetypes._registry import get_page_type, registered_tags, validate_registry
 from .render import escape_markdown, render_workspace_links
 from .render_html import md2html
 from .serialize import page_to_dict

@@ -23,7 +23,7 @@ from statemachine import Event, State, StateMachine
 from statemachine.exceptions import TransitionNotAllowed
 
 from .errors import IllegalCommandError
-from .pagetypes import ElementFSMSpec, FSMSpec
+from .pagetypes.core.specs import ElementFSMSpec, FSMSpec
 
 
 @lru_cache(maxsize=None)

@@ -28,7 +28,9 @@ from typing import Any
 
 from .describe import describe_mutations, describe_page_type
 from .model import Page
-from .pagetypes import COMPOUND, TRANSITION, FSMSpec, PageType, discoverable_registry, initial_sections
+from .pagetypes.core.specs import COMPOUND, TRANSITION, FSMSpec
+from .pagetypes.core.pagetype import PageType, initial_sections
+from .pagetypes._registry import discoverable_registry
 from .statecharts import page_machine_qualname
 
 # Kinds that fire the *page-status* FSM (element_transition fires an element's own FSM, so it is an

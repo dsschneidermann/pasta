@@ -6,7 +6,7 @@ from src.describe import (
     describe_mutations,
     describe_page_type,
 )
-from src.pagetypes import get_page_type
+from src.pagetypes._registry import get_page_type
 
 # Hand-authored capability fixtures (src.testtypes), so enriching a production type never
 # churns these introspection assertions.

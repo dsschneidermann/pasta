@@ -2,7 +2,10 @@
 
 from src.commands import apply_command, create_page
 from src.model import Page
-from src.pagetypes import LIST, SCALAR, FieldSpec, FSMSpec, PageType, get_page_type
+from src.pagetypes.core.specs import LIST, SCALAR, FSMSpec
+from src.pagetypes.core.fields import FieldSpec
+from src.pagetypes.core.pagetype import PageType
+from src.pagetypes._registry import get_page_type
 from src.render import RefContext
 from src.render_html import (_children_html, _field_html, _list_html, _references_html,
                              _text_html, element_view, render_page_html)
