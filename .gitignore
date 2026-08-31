@@ -25,3 +25,4 @@ docsite/page-types/
 graphify-out/cost.json
 graphify-out/cache/
 graphify-out/.*
+hmr_debug.log

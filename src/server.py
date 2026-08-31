@@ -624,3 +624,7 @@ async def unlink(workspaceId: str, fromId: str, toId: str, role: str) -> dict[st
         page, links = STORE.unlink_page(workspaceId, fromId, toId, role)
         await ws_reloader.refresh()
         return {"id": page.id, "links": links}
+
+
+# --- capture HMR reload errors to hmr_debug.log (see src/_hmr_debug.py) -------
+from . import _hmr_debug  # noqa: E402, F401
