@@ -58,8 +58,8 @@ def validate_registry() -> None:
 # --- Test-only page types ----------------------------------------------------
 # The `test-*` types (src.testtypes) are hand-authored, minimal capability fixtures - each
 # demonstrates one part of the page-type system so tests exercise the full surface without pinning
-# to (or cloning) any production type's shape. They are RESOLVABLE by `get_page_type` - so the
-# store, renderer, and pure core all operate on a test page the same as any other - but HIDDEN from
+# to (or cloning) any production type's shape. They are resolvable by `get_page_type` - so the
+# store, renderer, and pure core all operate on a test page the same as any other - but hidden from
 # discovery (the `describePageType` listing and doc-gen enumeration) unless this test-only flag is
 # set. Never set in production; flip it for the scope of a block with `expose_test_types()`.
 _expose_test_types = False
@@ -89,11 +89,11 @@ def expose_test_types() -> Generator[None]:
 
 
 # --- Test mode: production page types are off-limits to the test suite -------
-# Separate from `_expose_test_types` (which gates only the DISCOVERY of the test-* fixtures): under
-# test mode the PRODUCTION page types become inaccessible so a test can only ever exercise the
-# hand-authored test-* fixtures. They stop RESOLVING (`get_page_type`), stop being LISTED
+# Separate from `_expose_test_types` (which gates only the discovery of the test-* fixtures): under
+# test mode the production page types become inaccessible so a test can only ever exercise the
+# hand-authored test-* fixtures. They stop resolving (`get_page_type`), stop being listed
 # (`registered_tags` / `discoverable_registry`, hence the describePageType listing + doc-gen), and a
-# page of one cannot be CREATED - every such attempt raises `ProductionTypeInTestError`, steering the
+# page of one cannot be created - every such attempt raises `ProductionTypeInTestError`, steering the
 # author to a test-* fixture. Flipped on for the whole suite by tests/conftest.py; never set in
 # normal operation, where the guard is entirely inert.
 _test_mode = False
@@ -102,7 +102,7 @@ _test_mode = False
 def set_test_mode(on: bool = True) -> None:
     """Test-only: enter (or leave) test mode, in which production page types are off-limits - they do
     not resolve, are not listed, and cannot be instantiated (see `ProductionTypeInTestError`).
-    tests/conftest.py flips this on (via a session-scoped autouse fixture, so it takes effect AFTER
+    tests/conftest.py flips this on (via a session-scoped autouse fixture, so it takes effect after
     collection) for the whole run. Never called in normal operation."""
     global _test_mode
     _test_mode = on
@@ -121,7 +121,7 @@ def guard_production_type(tag: str) -> None:
 def get_page_type(tag: str) -> PageType | None:
     """Resolve a page type by tag. The hand-authored test-only types resolve too (see
     `expose_test_types`), so the store and pure core operate on them; only their *discovery* is
-    flag-gated. In test mode a PRODUCTION tag raises `ProductionTypeInTestError` instead of resolving
+    flag-gated. In test mode a production tag raises `ProductionTypeInTestError` instead of resolving
     (an unknown tag still returns None) - tests operate on the test-* fixtures, not production types."""
     test_type = _test_registry().get(tag)
     if test_type is not None:

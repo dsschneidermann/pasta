@@ -84,7 +84,7 @@ def test_waiting_writer_blocks_new_readers():
 
     threads.append(threading.Thread(target=late_reader))
     threads[2].start()
-    assert not late_reader_entered.wait(timeout=0.2) # held out by the waiting writer
+    assert not late_reader_entered.wait(timeout=0.2)  # held out by the waiting writer
 
     release_first_reader.set()
     assert writer_entered.wait(timeout=5)            # writer goes first

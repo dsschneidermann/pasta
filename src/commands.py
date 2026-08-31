@@ -49,6 +49,7 @@ _PYTHON_TYPE = {
     "object": dict,
 }
 
+
 @dataclass(frozen=True)
 class BatchContext:
     """Shared across a mutatePageBatch: the ids created by earlier commands in the batch. Positioned
@@ -662,8 +663,6 @@ def _add_block(page: Page, command: CommandSpec, args: dict[str, Any], id_factor
         _place_entry(entries, block, command, args, batch_context, offset=offset)
     created = [block["id"] for block in blocks]
     return (created[0] if created else None), created
-
-
 
 
 def _remove_by_id(page: Page, command: CommandSpec, args: dict[str, Any]) -> None:

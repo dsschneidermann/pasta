@@ -137,7 +137,7 @@ class Store:
             try:
                 os.replace(tmp, path)
             except Exception:
-                time.sleep(0.1) # Permission error moving the tmp file can be retried.
+                time.sleep(0.1)  # Permission error moving the tmp file can be retried.
                 os.replace(tmp, path)
 
     def _touch_and_save(self, workspace: Workspace) -> None:

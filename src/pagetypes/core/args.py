@@ -40,8 +40,6 @@ class ArgSpec:
     block_kinds: tuple[BlockKindSpec, ...] | None = None
 
 
-
-
 @dataclass(frozen=True)
 class CommandSpec:
     name: str

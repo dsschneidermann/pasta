@@ -85,8 +85,6 @@ class PageType:
             return arg
         return replace(arg, block_kinds=element_blocks.block_kinds)
 
-
-
     def command(self, name: str) -> CommandSpec | None:
         for command in self.commands:
             if command.name == name:

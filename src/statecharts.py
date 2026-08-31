@@ -12,6 +12,7 @@ from __future__ import annotations
 from .fsm import machine_class
 from .pagetypes._registry import get_page_type
 
+
 def _page_fsm(tag: str):
     page = get_page_type(tag)
     if page is None:

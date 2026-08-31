@@ -400,7 +400,6 @@ _FEATURE_SPEC = PageType(
 )
 
 
-
 _IMPLEMENTATION_PLAN = PageType(
     tag="implementation-plan",
     name="Implementation plan",
