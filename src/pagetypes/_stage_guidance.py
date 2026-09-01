@@ -1,6 +1,6 @@
 """The stage instructions a page type hands an agent on entering a state.
 
-A page type declares these on its FSM as `state_guidance`. They live here rather than
+A page type declares these on its FSM as `status_guidance`. They live here rather than
 inline so one working discipline can reach several page types, and so the text can be
 read and revised as prose instead of between a page type's sections and commands. The
 leading underscore sorts this module above every page-type module that draws on it.

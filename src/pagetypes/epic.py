@@ -14,9 +14,10 @@ from .core.specs import (
     ParentStateGuard,
     RefCheck,
 )
-from .core.args import _boolean, _integer, _text, add_link_cmd, set_title_cmd
-from .core.fields import SectionSpec, _list, _prose, _scalar
+from .core.args import _boolean, _integer, _text
 from .core.commands import (
+    add_link_cmd,
+    set_title_cmd,
     element_cmds,
     list_cmds,
     set_element_field_cmd,
@@ -24,6 +25,7 @@ from .core.commands import (
     set_scalar_cmd,
     transition_cmd,
 )
+from .core.fields import SectionSpec, _list, _prose, _scalar
 from .core.pagetype import PageType
 
 _QUESTION_FSM = ElementFSMSpec(

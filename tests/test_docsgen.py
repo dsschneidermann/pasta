@@ -16,6 +16,8 @@ from src.docsgen import (
     render_states_index,
     state_docs,
 )
+from src.pagetypes.core.pagetype import get_pagetype_command, get_pagetype_field
+from src.pagetypes.core.specs import status_guidance
 from src.pagetypes._registry import REGISTRY, get_page_type
 from src.statecharts import page_machine_qualname
 
@@ -129,12 +131,12 @@ def test_generated_docs_carry_the_instruction_on_the_field_not_the_setter():
     # The instruction reaches the docs through the field line (rendered as an indented block, so it
     # arrives line by line); the setter's own line is the short description.
     brief = get_page_type("feature-brief")
-    instruction = brief.field_spec("summary", "body").description
+    instruction = get_pagetype_field(brief, "summary", "body").description
     assert instruction and "\n" in instruction                # a wrapped multi-line authoring instruction
     docs = "\n".join(all_state_docs().values())
     for line in instruction.splitlines():
         assert line in docs                                   # still printed, from the Sections listing
-    assert brief.command("setSummary").description == "set the summary"
+    assert get_pagetype_command(brief, "setSummary").description == "set the summary"
     assert "- `setSummary(statusRevisionToken, text)` *(set_prose)* - set the summary" in docs
 
 
@@ -142,16 +144,16 @@ def test_generated_docs_do_not_repeat_the_instruction_under_every_setter():
     # The instruction's first line appears at most once per document (the Sections listing), where it
     # used to appear again under Commands and under Authoring commands.
     brief = get_page_type("feature-brief")
-    first_line = brief.field_spec("summary", "body").description.splitlines()[0]
+    first_line = get_pagetype_field(brief, "summary", "body").description.splitlines()[0]
     for doc in all_state_docs().values():
         if brief.tag in doc:
             assert doc.count(first_line) <= 1
 
 
 # --- per-state guidance on the generated page --------------------------------
-def test_state_page_opens_with_its_state_guidance():
+def test_state_page_opens_with_its_status_guidance():
     # The text an agent gets on entering a state is the text a human reads on its page.
-    guidance = get_page_type("feature-brief").fsm.guidance_for("review")
+    guidance = status_guidance(get_page_type("feature-brief").fsm, "review")
     assert guidance                                        # one of the documented states
     docs = state_docs(get_page_type("feature-brief"))
     for line in guidance.splitlines():

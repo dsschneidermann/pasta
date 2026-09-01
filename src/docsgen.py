@@ -201,7 +201,7 @@ def _render_state_doc(page_type: PageType, state: str, events: list[str],
                   for edge in described["fsm"]["transitions"] if edge["source"] == state}
 
     # A state's own guidance opens its page; states declaring none keep the placeholder.
-    guidance = described["fsm"]["stateGuidance"].get(state)
+    guidance = described["fsm"]["statusGuidance"].get(state)
     intro = (guidance or f"The `{state}` state of the `{tag}` page type.") + "\n\n"
 
     parts = [

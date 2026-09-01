@@ -4,9 +4,17 @@ from __future__ import annotations
 
 from ._stage_guidance import DECISION_RECORD_AUTHORING
 from .core.specs import FSMSpec
-from .core.args import _code_block, _text, _paragraph_text, add_link_cmd, set_title_cmd
+from .core.args import _code_block, _text, _paragraph_text
+from .core.commands import (
+    add_link_cmd,
+    set_title_cmd,
+    blocks_cmds,
+    list_cmds,
+    set_prose_cmd,
+    set_scalar_cmd,
+    transition_cmd,
+)
 from .core.fields import SectionSpec, _blocks, _list, _prose, _scalar
-from .core.commands import blocks_cmds, list_cmds, set_prose_cmd, set_scalar_cmd, transition_cmd
 from .core.pagetype import PageType
 
 _DECISION_RECORD = PageType(
@@ -103,6 +111,6 @@ _DECISION_RECORD = PageType(
         initial="authoring",
         states=("authoring", "accepted"),
         terminal_states=("accepted",),
-        state_guidance=(("authoring", DECISION_RECORD_AUTHORING),),
+        status_guidance=(("authoring", DECISION_RECORD_AUTHORING),),
     ),
 )

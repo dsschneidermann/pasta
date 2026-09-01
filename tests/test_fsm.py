@@ -46,10 +46,10 @@ def test_is_valid_status():
     assert not fsm.is_valid_status(CHILD, "nonexistent")
 
 
-def test_state_guidance_keeps_fsmspec_hashable_for_the_machine_cache():
+def test_status_guidance_keeps_fsmspec_hashable_for_the_machine_cache():
     # A dict field here would raise "unhashable type" at the _machine_class cache.
     made = [FSMSpec(name="Guided", initial="draft", states=("draft", "open"),
                     transitions=(("open", "draft", "open", "agent"),),
-                    state_guidance=(("open", "do the open work"),))
+                    status_guidance=(("open", "do the open work"),))
             for _ in range(2)]
     assert fsm.machine_class(made[0]) is fsm.machine_class(made[1])

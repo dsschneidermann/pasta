@@ -3,19 +3,21 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from ...errors import ValidationError
 
-if TYPE_CHECKING:
-    # Annotation only: a page type calls these, so importing it here at runtime
-    # would point the dependency back the way it came.
-    from .pagetype import PageType
-from .args import BlockKindSpec, CommandSpec, ElementBlocksSpec
-from .commands import is_field_setter
-from .fields import FieldSpec
-from .specs import ADD_ELEMENT, BLOCKS, LIST, SET_PROSE, SET_SCALAR, FSMSpec
+from .pagetype import PageType, get_pagetype_field
+from .args import BlockKindSpec, ElementBlocksSpec
+from .commands import CommandSpec, is_field_setter
+from .fields import FieldSpec, get_element_blocks
 from .specs import (
+    ADD_ELEMENT,
+    BLOCKS,
+    LIST,
+    SET_PROSE,
+    SET_SCALAR,
+    FSMSpec,
     BLOCK_ARRAY,
     INLINE_RUNS,
     INLINE_RUN_GRID,
@@ -124,11 +126,10 @@ def validate_block(entry: Any, block_kinds: tuple[BlockKindSpec, ...]) -> None:
         raise ValidationError(
             f"Block kind {kind!r} is not accepted here - one of {[block.kind for block in block_kinds]}."
         )
-    args = block.body_args()
-    extra = set(entry) - {arg.name for arg in args} - {"kind"}
+    extra = set(entry) - {arg.name for arg in block.body_args} - {"kind"}
     if extra:
         raise ValidationError(f"A '{kind}' block has unknown keys: {sorted(extra)}.")
-    for arg in args:
+    for arg in block.body_args:
         present = arg.name in entry and entry[arg.name] is not None
         if arg.required and not present:
             raise ValidationError(f"A '{kind}' block requires '{arg.name}'.")
@@ -196,9 +197,9 @@ def _block_ref_ids(entry: Any, block_kinds: tuple[BlockKindSpec, ...] | None) ->
     if block is None:
         return []
     ids: list[str] = []
-    for body in block.body_args():
-        if body.content is not None:
-            ids.extend(collect_ref_ids(body.content, entry.get(body.name)))
+    for arg in block.body_args:
+        if arg.content is not None:
+            ids.extend(collect_ref_ids(arg.content, entry.get(arg.name)))
     return ids
 
 
@@ -254,7 +255,7 @@ def validate_pagetype_setter_descriptions(page_type: PageType) -> list[str]:
         if command.kind not in (SET_SCALAR, SET_PROSE, ADD_ELEMENT):
             continue
         section, field = command.section, command.field
-        field_spec = (page_type.field_spec(section, field)
+        field_spec = (get_pagetype_field(page_type, section, field)
                       if section is not None and field is not None else None)
         if field_spec is None:
             errors.append(
@@ -294,7 +295,7 @@ def validate_pagetype_block_args(page_type: PageType) -> list[str]:
             if command.section is None or command.field is None:
                 errors.append(f"command '{command.name}' carries blocks but targets no field.")
                 continue
-            field_spec = page_type.field_spec(command.section, command.field)
+            field_spec = get_pagetype_field(page_type, command.section, command.field)
             if field_spec is None:
                 errors.append(
                     f"command '{command.name}' carries blocks for "
@@ -308,7 +309,7 @@ def validate_pagetype_block_args(page_type: PageType) -> list[str]:
                         f"command '{command.name}' carries blocks for "
                         f"{command.section}.{command.field}, which is not a blocks field.")
                 continue
-            if field_spec.element_blocks_spec(element_field) is None:
+            if get_element_blocks(field_spec, element_field) is None:
                 errors.append(
                     f"command '{command.name}' carries blocks for "
                     f"{command.section}.{command.field}.{element_field}, which is not declared "
@@ -378,14 +379,14 @@ def validate_page_types(registry: Mapping[str, PageType]) -> None:
 
 
 def validate_fsm_spec(fsm: FSMSpec) -> list[str]:
-    """Every state_guidance pair names a declared state, and no state twice."""
+    """Every status_guidance pair names a declared state, and no state twice."""
     errors: list[str] = []
     seen: set[str] = set()
-    for state, _text in fsm.state_guidance:
+    for state, _text in fsm.status_guidance:
         if state not in fsm.states:
-            errors.append(f"{fsm.name}: state_guidance names unknown state '{state}'.")
+            errors.append(f"{fsm.name}: status_guidance names unknown state '{state}'.")
         elif state in seen:
-            errors.append(f"{fsm.name}: state_guidance names '{state}' twice.")
+            errors.append(f"{fsm.name}: status_guidance names '{state}' twice.")
         seen.add(state)
     return errors
 

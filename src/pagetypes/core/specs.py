@@ -72,7 +72,7 @@ class FSMSpec:
     """A page's status FSM: its state set and initial state ONLY.
 
     The transition table is NOT stored here - it is DERIVED from the page type's transition/compound
-    commands by `status_transitions(page_type)`, where each such command declares its source state(s)
+    commands by `_status_transitions(page_type)`, where each such command declares its source state(s)
     via `legal_in=` and its destination via `dest=`. So a status edge lives in exactly one place (the
     command), and `legal_in` is the uniform "where is this command legal" declaration across every
     command kind. (Element lifecycles are a separate concept - see `ElementFSMSpec`.)
@@ -84,32 +84,33 @@ class FSMSpec:
     transitions: only states listed here are authoring-locked. An authoring command can opt out by naming
     the terminal state in `legal_in`.
 
-    `state_guidance` is the stage instruction for a status - what the state you just entered is
-    for - echoed by the write path and used to open that state's generated doc page. It is a
-    tuple of `(state, text)` pairs, not a mapping, because this spec is the `@lru_cache` key in
-    `fsm._machine_class`. Leaving a state undeclared is the normal case.
+    `status_guidance` is the per-status stage instruction: what a page in that status is for and
+    what the work in it consists of. It is a tuple of `(status, text)` pairs, not a mapping,
+    because this spec is the `@lru_cache` key in `fsm._machine_class`. Leaving a status undeclared
+    is the normal case.
     """
     name: str
     initial: str
     states: tuple[str, ...]
     transitions: tuple[tuple[str, str, str, str], ...] = ()
     terminal_states: tuple[str, ...] = ()
-    state_guidance: tuple[tuple[str, str], ...] = ()
+    status_guidance: tuple[tuple[str, str], ...] = ()
 
     def __post_init__(self):
         # Setup only: normalize each guidance text as authored (dedent a
         # newline-stripped block, then rstrip). The state names are checked by
         # validate_fsm_spec, not here.
         normalized = tuple((state, dedent(text.strip("\n")).rstrip())
-                           for state, text in self.state_guidance)
-        object.__setattr__(self, "state_guidance", normalized)
+                           for state, text in self.status_guidance)
+        object.__setattr__(self, "status_guidance", normalized)
 
-    def guidance_for(self, state: str) -> str | None:
-        """The stage instruction for `state`, or None when the type declares none for it."""
-        for name, text in self.state_guidance:
-            if name == state:
-                return text
-        return None
+
+def status_guidance(self: FSMSpec, status: str) -> str | None:
+    """The stage instruction for `status`, or None when the type declares none for it."""
+    for name, text in self.status_guidance:
+        if name == status:
+            return text
+    return None
 
 
 @dataclass(frozen=True)

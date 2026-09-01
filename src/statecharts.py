@@ -10,6 +10,7 @@ its page type because it is derived from the same ``FSMSpec`` in the registry.
 from __future__ import annotations
 
 from .fsm import machine_class
+from .pagetypes.core.pagetype import get_pagetype_field
 from .pagetypes._registry import get_page_type
 
 
@@ -24,7 +25,7 @@ def _element_fsm(tag: str, section: str, field: str):
     page = get_page_type(tag)
     if page is None:
         raise KeyError(f"Unknown page type {tag!r}.")
-    field_spec = page.field_spec(section, field)
+    field_spec = get_pagetype_field(page, section, field)
     if field_spec is None:
         raise KeyError(f"Unknown field {section!r} {field!r}.")
     element_fsm = field_spec.element_fsm

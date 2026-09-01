@@ -64,27 +64,10 @@ from .pagetypes.core.specs import (
     RefCheck,
     WorkspaceGuidanceSpec,
 )
-from .pagetypes.core.args import (
-    BlockKindSpec,
-    ElementBlocksSpec,
-    _boolean,
-    _code_block,
-    _list_block,
-    _paragraph_runs,
-    _paragraph_text,
-    _text,
+from .pagetypes.core.args import BlockKindSpec, ElementBlocksSpec, _boolean, _code_block, _list_block, _paragraph_runs, _paragraph_text, _text, standard_blocks
+from .pagetypes.core.commands import (
     add_link_cmd,
     set_title_cmd,
-    standard_blocks,
-)
-from .pagetypes.core.fields import (
-    SectionSpec,
-    _blocks,
-    _list,
-    _prose,
-    _scalar,
-)
-from .pagetypes.core.commands import (
     blocks_cmds,
     element_blocks_cmds,
     element_cmds,
@@ -94,6 +77,13 @@ from .pagetypes.core.commands import (
     set_scalar_cmd,
     transition_cmd,
     transition_on_add_cmd,
+)
+from .pagetypes.core.fields import (
+    SectionSpec,
+    _blocks,
+    _list,
+    _prose,
+    _scalar,
 )
 from .pagetypes.core.pagetype import PageType
 
@@ -259,7 +249,7 @@ TEST_FLOW = PageType(
         states=("draft", "open", "closed"),
         terminal_states=("closed",),
         # Only `open` is guided, leaving draft and closed to fixture the unguided paths.
-        state_guidance=(("open", """
+        status_guidance=(("open", """
             open - the work is under way.
             Record a commit with close when it is finished.
             """),),
@@ -332,7 +322,7 @@ TEST_LIFECYCLE = PageType(
         initial="draft",
         states=("draft", "planning", "building", "review", "done", "abandoned"),
         terminal_states=("done", "abandoned"),
-        state_guidance=(("review", """
+        status_guidance=(("review", """
             review - the build is done.
             Check the child steps and checks before the ship gate.
             """),),
@@ -390,7 +380,7 @@ TEST_CHILD = PageType(
             _list("items", element_fields=("text", "note", "status"),
                   element_fsm=_STEP_FSM,
                   element_blocks=(ElementBlocksSpec("note", (
-                      BlockKindSpec("decision", args=(_text("questionId"), _text()),
+                      BlockKindSpec("decision", body_args=(_text("questionId"), _text()),
                                     ref_check=RefCheck(arg="questionId", scope="parent",
                                                        section="questions", field="items")),
                       _paragraph_runs(),
@@ -407,7 +397,7 @@ TEST_CHILD = PageType(
         )),
         SectionSpec("decisions", "Decisions", (
             _blocks("body", (
-                        BlockKindSpec("decision", args=(_text("questionId"), _text()),
+                        BlockKindSpec("decision", body_args=(_text("questionId"), _text()),
                                       ref_check=RefCheck(arg="questionId", scope="parent",
                                                          section="questions", field="items")),
                         _paragraph_text(),
@@ -450,7 +440,7 @@ TEST_CHILD = PageType(
         initial="draft",
         states=("draft", "ready"),
         # A guided initial state, which is what makes createPage's echo testable.
-        state_guidance=(("draft", "draft - write the steps and checks here."),),
+        status_guidance=(("draft", "draft - write the steps and checks here."),),
     ),
 )
 

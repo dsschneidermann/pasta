@@ -10,9 +10,10 @@ from ._workspace_guidance import (
     TESTING_TOOL_FIELD,
 )
 from .core.specs import FSMSpec, WorkspaceGuidanceSpec
-from .core.args import _text, add_link_cmd, set_title_cmd
-from .core.fields import SectionSpec, _list, _prose, _scalar
+from .core.args import _text
 from .core.commands import (
+    add_link_cmd,
+    set_title_cmd,
     list_cmds,
     set_element_field_cmd,
     set_prose_cmd,
@@ -20,6 +21,7 @@ from .core.commands import (
     transition_cmd,
     transition_on_add_cmd,
 )
+from .core.fields import SectionSpec, _list, _prose, _scalar
 from .core.pagetype import PageType
 
 _COMMIT_LOG_STATES = ("open", "review", "done", "closed")
@@ -114,7 +116,7 @@ _SIMPLE_CHANGE = PageType(
         name="SimpleChange",
         initial="draft",
         states=("draft", "open", "review", "done", "closed"),
-        state_guidance=(
+        status_guidance=(
             ("draft", SIMPLE_CHANGE_DRAFT),
             ("open", SIMPLE_CHANGE_OPEN),
             ("review", REVIEW),

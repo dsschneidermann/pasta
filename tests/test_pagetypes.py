@@ -37,34 +37,25 @@ from src.pagetypes.core.specs import (
     LIST,
     PROSE,
     FSMSpec,
+    status_guidance,
 )
-from src.pagetypes.core.args import (
-    BlockKindSpec,
-    CommandSpec,
-    ElementBlocksSpec,
-    _array,
-    _boolean,
-    _code_block,
-    _divider_block,
-    _heading_runs,
-    _heading_text,
-    _integer,
-    _list_block,
-    _paragraph_runs,
-    _paragraph_text,
-    _quote_block,
-    _table_block,
-    _text,
-    standard_blocks,
+from src.pagetypes.core.args import BlockKindSpec, ElementBlocksSpec, _array, _boolean, _code_block, _divider_block, _heading_runs, _heading_text, _integer, _list_block, _paragraph_runs, _paragraph_text, _quote_block, _table_block, _text, standard_blocks
+from src.pagetypes.core.commands import CommandSpec, blocks_cmds, element_blocks_cmds, list_cmds, set_prose_cmd
+from src.pagetypes.core.fields import (
+    FieldSpec,
+    SectionSpec,
+    _blocks,
+    _list,
+    _prose,
+    block_element_fields,
+    get_element_blocks,
 )
-from src.pagetypes.core.fields import FieldSpec, SectionSpec, _blocks, _list, _prose
-from src.pagetypes.core.commands import (
-    blocks_cmds,
-    element_blocks_cmds,
-    list_cmds,
-    set_prose_cmd,
+from src.pagetypes.core.pagetype import (
+    PageType,
+    initial_sections,
+    get_pagetype_command,
+    get_pagetype_field,
 )
-from src.pagetypes.core.pagetype import PageType, initial_sections, status_transitions
 from src.pagetypes.core.validation import (
     collect_ref_ids,
     validate_block,
@@ -72,10 +63,6 @@ from src.pagetypes.core.validation import (
     validate_inline_content,
     validate_pagetype_field_setters,
     validate_table,
-)
-from src.pagetypes._registry import REGISTRY, get_page_type
-from src.pagetypes import _stage_guidance
-from src.pagetypes.core.validation import (
     validate_field_spec,
     validate_fsm_spec,
     validate_page_type,
@@ -83,6 +70,8 @@ from src.pagetypes.core.validation import (
     validate_pagetype_block_args,
     validate_pagetype_setter_descriptions,
 )
+from src.pagetypes._registry import REGISTRY, get_page_type
+from src.pagetypes import _stage_guidance
 from src.testtypes import TEST_REGISTRY
 
 _STANDARD_BLOCK_HELPERS = {
@@ -116,8 +105,9 @@ def test_fsm_is_well_formed(tag: str):
     page_type = ALL_TYPES[tag]
     fsm = page_type.fsm
     assert fsm.initial in fsm.states
-    # The status transition table is DERIVED from the type's transition/compound commands.
-    for _event, source, dest, agency in status_transitions(page_type):
+    # The status transition table is DERIVED from the type's transition/compound commands,
+    # and PageType.__post_init__ writes it onto the fsm.
+    for _event, source, dest, agency in page_type.fsm.transitions:
         assert source in fsm.states, f"{tag}: transition source {source} not a state"
         assert dest in fsm.states, f"{tag}: transition dest {dest} not a state"
         assert agency in {"agent", "human", "either"}
@@ -146,7 +136,7 @@ def test_content_commands_target_real_fields(tag: str):
     page_type = ALL_TYPES[tag]
     for command in page_type.commands:
         if command.kind in CONTENT_TARGETING:
-            field_spec = page_type.field_spec(command.section, command.field)
+            field_spec = get_pagetype_field(page_type, command.section, command.field)
             assert field_spec is not None, f"{tag}.{command.name} targets missing {command.section}.{command.field}"
             if command.kind in ELEMENT_MAPPING:
                 # every mapped element field must be declared on the list field
@@ -180,7 +170,7 @@ def test_requires_reference_real_fields(tag: str):
     page_type = ALL_TYPES[tag]
     for command in page_type.commands:
         for section_key, field_key in command.requires:
-            assert page_type.field_spec(section_key, field_key) is not None, (
+            assert get_pagetype_field(page_type, section_key, field_key) is not None, (
                 f"{tag}.{command.name} requires missing field {section_key}.{field_key}"
             )
 
@@ -191,7 +181,7 @@ def test_element_transitions_reference_real_element_events(tag: str):
     page_type = ALL_TYPES[tag]
     for command in page_type.commands:
         if command.kind == ELEMENT_TRANSITION:
-            field_spec = page_type.field_spec(command.section, command.field)
+            field_spec = get_pagetype_field(page_type, command.section, command.field)
             assert field_spec is not None and field_spec.element_fsm is not None, (
                 f"{tag}.{command.name} drives an element FSM on a field that has none"
             )
@@ -207,7 +197,7 @@ def test_block_commands_target_blocks_fields(tag: str):
     for command in page_type.commands:
         if command.kind not in BLOCK_TARGETING:
             continue
-        field_spec = page_type.field_spec(command.section, command.field)
+        field_spec = get_pagetype_field(page_type, command.section, command.field)
         if command.element_field is None:
             assert field_spec is not None and field_spec.kind == BLOCKS, (
                 f"{tag}.{command.name} targets {command.section}.{command.field}, which is not a blocks field"
@@ -216,7 +206,7 @@ def test_block_commands_target_blocks_fields(tag: str):
         assert field_spec is not None and field_spec.kind == LIST, (
             f"{tag}.{command.name} is element-scoped but {command.section}.{command.field} is not a list field"
         )
-        element_blocks = field_spec.element_blocks_spec(command.element_field)
+        element_blocks = get_element_blocks(field_spec, command.element_field)
         assert element_blocks is not None, (
             f"{tag}.{command.name} targets element field {command.element_field}, "
             f"which {command.section}.{command.field} does not declare as block-bearing"
@@ -256,7 +246,7 @@ def test_every_ordered_field_has_a_reorder_command(tag: str):
             if field_spec.kind == LIST:
                 assert reorder_kind_by_target.get(target) == REORDER_ELEMENT, \
                     f"{tag}.{section.key}.{field_spec.key} (list) has no reorder_element command"
-                for element_field in field_spec.block_element_fields():
+                for element_field in block_element_fields(field_spec):
                     assert (*target, element_field) in element_block_reorders, (
                         f"{tag}.{section.key}.{field_spec.key}.{element_field} (element blocks) "
                         f"has no reorder_block command"
@@ -300,7 +290,7 @@ def test_field_setter_description_is_short_and_not_the_instruction(tag: str):
     page_type = ALL_TYPES[tag]
     for command in page_type.commands:
         if is_field_setter(command):
-            field_spec = page_type.field_spec(command.section, command.field)
+            field_spec = get_pagetype_field(page_type, command.section, command.field)
             assert field_spec is not None, f"{tag}.{command.name} targets a missing field"
             assert command.description, f"{tag}.{command.name} has no description"
             assert "\n" not in command.description, f"{tag}.{command.name} description is multi-line"
@@ -312,7 +302,8 @@ def test_field_setter_description_is_short_and_not_the_instruction(tag: str):
 def _drift_type(setter_description: str, field_description: str):
     """A one-setter page type whose setter and field descriptions are both caller-controlled, so a
     test can pick which branch of the field-setter validation fires."""
-    from src.pagetypes.core.args import CommandSpec, _text
+    from src.pagetypes.core.args import _text
+    from src.pagetypes.core.commands import CommandSpec
     from src.pagetypes.core.specs import FSMSpec
     from src.pagetypes.core.fields import SectionSpec, _prose
     from src.pagetypes.core.pagetype import PageType
@@ -343,7 +334,8 @@ def test_field_setter_repeating_a_single_line_field_instruction_is_rejected():
 
 def test_field_setter_targeting_an_unknown_field_is_still_rejected():
     # The pre-existing check must survive the guard rewrite it sat beside.
-    from src.pagetypes.core.args import CommandSpec, _text
+    from src.pagetypes.core.args import _text
+    from src.pagetypes.core.commands import CommandSpec
     from src.pagetypes.core.specs import FSMSpec
     from src.pagetypes.core.fields import SectionSpec, _prose
     from src.pagetypes.core.pagetype import PageType
@@ -377,7 +369,7 @@ def test_add_link_on_every_authorable_type_but_not_toc():
     # add_link_cmd() is added to every authorable production page type; the command-less toc is the
     # sole exception - it has no authoring surface at all, so it must NOT carry addLink.
     for tag, page_type in REGISTRY.items():
-        command = page_type.command("addLink")
+        command = get_pagetype_command(page_type, "addLink")
         if tag == "toc":
             assert command is None, "toc cannot be authored - it must not carry addLink"
         else:
@@ -390,7 +382,7 @@ def test_set_title_on_every_authorable_type_but_not_toc():
     # set_title_cmd() - the universal rename alias - is added to every authorable production page type
     # alongside addLink; the command-less toc is the sole exception with no authoring surface.
     for tag, page_type in REGISTRY.items():
-        command = page_type.command("setTitle")
+        command = get_pagetype_command(page_type, "setTitle")
         if tag == "toc":
             assert command is None, "toc cannot be authored - it must not carry setTitle"
         else:
@@ -401,30 +393,30 @@ def test_reorder_split_into_two_kinds_with_anchored_args():
     # The list-field and blocks-field reorders are two parallel kinds; both carry (id, toIndex, precedingId).
     child_names = {command.name for command in CHILD.commands}
     assert "reorderStep" in child_names and "moveStep" not in child_names and "reorderSteps" not in child_names
-    assert CHILD.command("reorderStep").kind == REORDER_ELEMENT
-    assert [arg.name for arg in CHILD.command("reorderStep").args] == ["stepId", "toIndex", "precedingId"]
-    assert BLK.command("reorderBlock").kind == REORDER_BLOCK
-    assert [arg.name for arg in BLK.command("reorderBlock").args] == ["blockId", "toIndex", "precedingId"]
+    assert get_pagetype_command(CHILD, "reorderStep").kind == REORDER_ELEMENT
+    assert [arg.name for arg in get_pagetype_command(CHILD, "reorderStep").args] == ["stepId", "toIndex", "precedingId"]
+    assert get_pagetype_command(BLK, "reorderBlock").kind == REORDER_BLOCK
+    assert [arg.name for arg in get_pagetype_command(BLK, "reorderBlock").args] == ["blockId", "toIndex", "precedingId"]
 
 
 def test_blocks_body_is_an_inline_run_blocks_field():
     """The kind is data in the argument now, so the paragraph's inline-run shape is reached
     through the field's vocabulary rather than through a per-kind command."""
-    field = BLK.field_spec("body", "body")
+    field = get_pagetype_field(BLK, "body", "body")
     assert field.kind == BLOCKS
-    add = BLK.command("addBody")
+    add = get_pagetype_command(BLK, "addBody")
     assert add.kind == ADD_BLOCK and add.args[0].content == BLOCK_ARRAY
     paragraph = next(block for block in field.block_kinds if block.kind == "paragraph")
-    assert paragraph.body_args()[0].content == INLINE_RUNS
+    assert paragraph.body_args[0].content == INLINE_RUNS
 
 
 def test_element_fsms_declare_checkmark_done():
     """The checkbox mapping lives on the element FSM (ElementFSMSpec): checkmark_done names the [x]
     state, `initial` is the [ ] state, and an element FSM without checkmark_done renders no box. A
     page-status FSMSpec has no checkmark_done at all - page states are never checkboxes."""
-    step_fsm = CHILD.field_spec("steps", "items").element_fsm
-    check_fsm = CHILD.field_spec("checks", "items").element_fsm
-    question_fsm = LIFE.field_spec("questions", "items").element_fsm
+    step_fsm = get_pagetype_field(CHILD, "steps", "items").element_fsm
+    check_fsm = get_pagetype_field(CHILD, "checks", "items").element_fsm
+    question_fsm = get_pagetype_field(LIFE, "questions", "items").element_fsm
     assert step_fsm.checkmark_done == "done"         # initial "todo" -> [ ], "done" -> [x]
     assert check_fsm.checkmark_done == "passed"      # "pending" -> [ ], "passed" -> [x], "failed" -> no box
     assert question_fsm.checkmark_done is None       # open/answered render without a box
@@ -499,30 +491,30 @@ def test_collect_ref_ids_across_shapes():
     assert collect_ref_ids(INLINE_RUNS, [{"ref": 123}]) == []
 
 
-# --- FSMSpec.state_guidance --------------------------------------------------
-def test_state_guidance_normalizes_authored_text():
+# --- FSMSpec.status_guidance --------------------------------------------------
+def test_status_guidance_normalizes_authored_text():
     # Authored as an indented block; it must arrive as written, wrap breaks kept.
     spec = FSMSpec(name="G", initial="a", states=("a", "b"),
-                   state_guidance=(("b", "\n    line one\n    line two\n  "),))
-    assert spec.guidance_for("b") == "line one\nline two"
+                   status_guidance=(("b", "\n    line one\n    line two\n  "),))
+    assert status_guidance(spec, "b") == "line one\nline two"
 
 
-def test_guidance_for_returns_none_for_undeclared_state():
+def test_status_guidance_returns_none_for_undeclared_state():
     # None rather than "", so the caller can tell undeclared from empty.
     spec = FSMSpec(name="G", initial="a", states=("a", "b"),
-                   state_guidance=(("b", "some guidance"),))
-    assert spec.guidance_for("a") is None
+                   status_guidance=(("b", "some guidance"),))
+    assert status_guidance(spec, "a") is None
 
 
-def test_state_guidance_rejects_unknown_state():
+def test_status_guidance_rejects_unknown_state():
     # A typo in a state name is reported by the validator, not silently never appearing.
-    fsm = FSMSpec(name="G", initial="a", states=("a",), state_guidance=(("nope", "x"),))
+    fsm = FSMSpec(name="G", initial="a", states=("a",), status_guidance=(("nope", "x"),))
     assert any("unknown state" in error for error in validate_fsm_spec(fsm))
 
 
-def test_state_guidance_rejects_duplicate_state():
+def test_status_guidance_rejects_duplicate_state():
     fsm = FSMSpec(name="G", initial="a", states=("a",),
-                  state_guidance=(("a", "x"), ("a", "y")))
+                  status_guidance=(("a", "x"), ("a", "y")))
     assert any("twice" in error for error in validate_fsm_spec(fsm))
 
 
@@ -534,7 +526,7 @@ def test_every_production_guidance_text_comes_from_the_stage_guidance_module():
                  if name.isupper() and isinstance(value, str)}
     declared = [(tag, state, text)
                 for tag, page_type in REGISTRY.items()
-                for state, text in page_type.fsm.state_guidance]
+                for state, text in page_type.fsm.status_guidance]
     assert declared, "no production page type declares stage guidance"
     for tag, state, text in declared:
         assert text in constants, f"{tag}.{state} guidance is not a _stage_guidance constant"
@@ -544,21 +536,21 @@ def test_every_production_guidance_text_comes_from_the_stage_guidance_module():
 def test_block_kind_spec_resolves_body_args():
     # A kind carries its own body args; the same kind name can mean a different body in a different
     # field, which is what a per-field override is.
-    assert _code_block().body_args() == (_text("language"), _text("source"))
-    override = BlockKindSpec("paragraph", args=(_text(),))
-    assert override.body_args() == (_text(),)
-    assert override.body_args() != _paragraph_runs().body_args()
+    assert _code_block().body_args == (_text("language"), _text("source"))
+    override = BlockKindSpec("paragraph", body_args=(_text(),))
+    assert override.body_args == (_text(),)
+    assert override.body_args != _paragraph_runs().body_args
 
 
 def test_block_kind_spec_rejects_a_bad_declaration():
     # Every kind declares its own args - there is no shared table to fall back on - and a custom
     # kind like `decision` is defined exactly by declaring them.
     with pytest.raises(TypeError):
-        BlockKindSpec("decision")                        # args is required
-    custom = BlockKindSpec("decision", args=(_text("questionId"), _text()))
-    assert custom.body_args() == (_text("questionId"), _text())
+        BlockKindSpec("decision")                        # body_args is required
+    custom = BlockKindSpec("decision", body_args=(_text("questionId"), _text()))
+    assert custom.body_args == (_text("questionId"), _text())
     assert any("non-empty name" in error
-               for error in validate_field_spec(_blocks("body", block_kinds=(BlockKindSpec("", args=()),))))
+               for error in validate_field_spec(_blocks("body", block_kinds=(BlockKindSpec("", body_args=()),))))
 
 
 def test_block_kind_helpers():
@@ -566,25 +558,25 @@ def test_block_kind_helpers():
     # the old per-kind table. Asserted against explicit expected args (not a lookup) so the test
     # stands on its own once that table is gone.
     assert _paragraph_runs().kind == "paragraph"
-    assert _paragraph_runs().body_args() == (_array("inlines", content=INLINE_RUNS),)
-    assert _heading_runs().body_args() == (_integer("level"), _array("inlines", content=INLINE_RUNS))
-    assert _code_block().body_args() == (_text("language"), _text("source"))
+    assert _paragraph_runs().body_args == (_array("inlines", content=INLINE_RUNS),)
+    assert _heading_runs().body_args == (_integer("level"), _array("inlines", content=INLINE_RUNS))
+    assert _code_block().body_args == (_text("language"), _text("source"))
     assert _list_block().kind == "list"
-    assert _list_block().body_args() == (_boolean("ordered"), _array("items", content=INLINE_RUN_LISTS))
-    assert _quote_block().body_args() == (_array("paragraphs", content=INLINE_RUN_LISTS),)
-    assert _table_block().body_args() == (_array("header", content=INLINE_RUN_LISTS),
+    assert _list_block().body_args == (_boolean("ordered"), _array("items", content=INLINE_RUN_LISTS))
+    assert _quote_block().body_args == (_array("paragraphs", content=INLINE_RUN_LISTS),)
+    assert _table_block().body_args == (_array("header", content=INLINE_RUN_LISTS),
                                     _array("rows", content=INLINE_RUN_GRID),
                                     _array("align", required=False, content=TABLE_ALIGN))
-    assert _divider_block().kind == "divider" and _divider_block().body_args() == ()
+    assert _divider_block().kind == "divider" and _divider_block().body_args == ()
     # The text-only variants: one plain `text` arg (no inline-run shape) in place of `inlines`.
-    assert _paragraph_text().body_args() == (_text(),)
-    assert _heading_text().body_args() == (_integer("level"), _text())
+    assert _paragraph_text().body_args == (_text(),)
+    assert _heading_text().body_args == (_integer("level"), _text())
     # standard_blocks() is the whole vocabulary, in the canonical order.
     assert [block.kind for block in standard_blocks()] == [
         "paragraph", "heading", "code", "list", "quote", "table", "divider"]
-    assert [block.body_args() for block in standard_blocks()] == [
-        _paragraph_runs().body_args(), _heading_runs().body_args(), _code_block().body_args(),
-        _list_block().body_args(), _quote_block().body_args(), _table_block().body_args(), _divider_block().body_args()]
+    assert [block.body_args for block in standard_blocks()] == [
+        _paragraph_runs().body_args, _heading_runs().body_args, _code_block().body_args,
+        _list_block().body_args, _quote_block().body_args, _table_block().body_args, _divider_block().body_args]
 
 
 def test_field_spec_block_kinds():
@@ -637,19 +629,19 @@ def test_element_blocks_rejects_a_bad_declaration():
     # A block kind carrying an empty name is rejected through the element-blocks path too.
     assert any("non-empty name" in error for error in validate_field_spec(
         FieldSpec(key="items", kind=LIST, element_fields=("text", "detail"),
-                  element_blocks=(ElementBlocksSpec("detail", (BlockKindSpec("", args=()),)),))))
+                  element_blocks=(ElementBlocksSpec("detail", (BlockKindSpec("", body_args=()),)),))))
 
 
 def test_block_element_fields_names_the_declared_fields():
     field = _list("items", element_fields=("text", "snippet", "detail"),
                   element_blocks=(ElementBlocksSpec("snippet", (_code_block(),)),
                                   ElementBlocksSpec("detail", (_paragraph_runs(),))))
-    assert field.block_element_fields() == ("snippet", "detail")     # declared order
-    snippet = field.element_blocks_spec("snippet")
+    assert block_element_fields(field) == ("snippet", "detail")     # declared order
+    snippet = get_element_blocks(field, "snippet")
     assert snippet is not None and [block.kind for block in snippet.block_kinds] == ["code"]
-    assert field.element_blocks_spec("text") is None                 # a scalar element field
+    assert get_element_blocks(field, "text") is None                 # a scalar element field
     # A list declaring none reports an empty tuple - what keeps every consumer's scalar path intact.
-    assert _list("items", element_fields=("text",)).block_element_fields() == ()
+    assert block_element_fields(_list("items", element_fields=("text",))) == ()
 
 
 def test_validate_block_accepts_one_declared_block():
@@ -668,7 +660,7 @@ def test_validate_block_reads_a_per_field_arg_override():
     `inlines`, and a field declaring the standard kind does the reverse. If any consumer read a
     shared table instead of the kind's own args this would pass in one direction only.
     """
-    plain = (BlockKindSpec("paragraph", args=(_text(),)),)
+    plain = (BlockKindSpec("paragraph", body_args=(_text(),)),)
     validate_block({"kind": "paragraph", "text": "just prose"}, plain)
     with pytest.raises(ValidationError, match="unknown keys"):
         validate_block({"kind": "paragraph", "inlines": ["prose"]}, plain)
@@ -679,7 +671,7 @@ def test_validate_block_reads_a_per_field_arg_override():
 
 def test_validate_block_accepts_a_kind_the_standard_table_does_not_know():
     """A custom kind exists only as a name plus declared args - feature-spec's `decision`."""
-    decision = (BlockKindSpec("decision", args=(_text("questionId"), _text())),)
+    decision = (BlockKindSpec("decision", body_args=(_text("questionId"), _text())),)
     validate_block({"kind": "decision", "questionId": "q:1", "text": "we chose X"}, decision)
     with pytest.raises(ValidationError, match="requires 'questionId'"):
         validate_block({"kind": "decision", "text": "we chose X"}, decision)
@@ -727,7 +719,7 @@ def test_collect_ref_ids_finds_a_ref_inside_a_block():
 
 def test_collect_ref_ids_reads_runs_off_an_overridden_kind():
     """An override moves a kind's runs to a different arg, so reading a shared table would miss them."""
-    kinds = (BlockKindSpec("note", args=(_array("body", content=INLINE_RUNS),)),)
+    kinds = (BlockKindSpec("note", body_args=(_array("body", content=INLINE_RUNS),)),)
     assert collect_ref_ids(
         BLOCK_ARRAY, [{"kind": "note", "body": ["see ", {"ref": "a:1"}]}], kinds) == ["a:1"]
 
@@ -933,13 +925,13 @@ def test_a_block_argument_is_resolved_from_its_field():
 def _targeted_vocabulary(page_type, command, arg):
     """The vocabulary `arg` should carry, worked out from the sections independently of the
     resolution step - so the two can be compared rather than one trusting the other."""
-    field_spec = page_type.field_spec(command.section, command.field)
+    field_spec = get_pagetype_field(page_type, command.section, command.field)
     assert field_spec is not None
     element_field = command.element_field or (
         arg.name if command.kind == ADD_ELEMENT else None)
     if element_field is None:
         return field_spec.block_kinds
-    element_blocks = field_spec.element_blocks_spec(element_field)
+    element_blocks = get_element_blocks(field_spec, element_field)
     assert element_blocks is not None
     return element_blocks.block_kinds
 
@@ -1007,7 +999,7 @@ def test_an_unresolvable_block_argument_is_left_unfilled_rather_than_raising():
         tag="xtest-unfilled", name="Unfilled", description="ad-hoc",
         sections=(SectionSpec("body", "Body", (_prose("body"),)),), commands=(add,),
         fsm=FSMSpec(name="XTestUnfilled", initial="active", states=("active",)))
-    resolved = built.command("addBody")
+    resolved = get_pagetype_command(built, "addBody")
     assert resolved is not None and resolved.args[0].block_kinds is None
 
 
@@ -1025,7 +1017,7 @@ def test_validate_page_types_aggregates_every_defect_into_one_raise():
         sections=(SectionSpec("body", "Body", (body,)),),
         commands=(set_prose_cmd("body"), *blocks_cmds("body")),
         fsm=FSMSpec(name="XBroken", initial="active", states=("active",),
-                    state_guidance=(("nope", "x"),)),
+                    status_guidance=(("nope", "x"),)),
     )
     with pytest.raises(ValueError) as exc:
         validate_page_types({broken.tag: broken})

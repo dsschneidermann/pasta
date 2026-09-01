@@ -31,9 +31,9 @@ from . import cleanup, commands, fsm, render, render_html
 from .errors import ConflictError, PastaError, IllegalCommandError, NotFoundError, ValidationError
 from .ids import IdFactory, RevisionFactory, default_id_factory, default_revision_factory, new_id
 from .model import Page, Workspace
-from .pagetypes.core.specs import ADD_LINK, BLOCK_ARRAY, COMPOUND, LIST, TRANSITION, RefCheck
-from .pagetypes.core.args import CommandSpec
-from .pagetypes.core.pagetype import PageType
+from .pagetypes.core.specs import ADD_LINK, BLOCK_ARRAY, COMPOUND, LIST, TRANSITION, RefCheck, status_guidance
+from .pagetypes.core.commands import CommandSpec
+from .pagetypes.core.pagetype import PageType, get_pagetype_command
 from .pagetypes.core.validation import collect_ref_ids
 from .pagetypes._registry import (
     get_page_type,
@@ -56,7 +56,7 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def workspace_guidance_for(page_type: PageType, status: str,
+def workspace_guidance(page_type: PageType, status: str,
                            config: dict[str, str]) -> dict[str, str]:
     """Given a page type at a status, the stored text for each of its workspace guidance fields
     shown at that status (an empty value clears the field)."""
@@ -479,10 +479,10 @@ class Store:
             if focus is not None and not focus.archived:
                 focus_type = get_page_type(focus.type)
                 if focus_type is not None:
-                    state_guidance = focus_type.fsm.guidance_for(focus.status)
-                    if state_guidance is not None:
-                        result["guidance"] = state_guidance
-                    result.update(workspace_guidance_for(
+                    guidance = status_guidance(focus_type.fsm, focus.status)
+                    if guidance is not None:
+                        result["guidance"] = guidance
+                    result.update(workspace_guidance(
                         focus_type, focus.status, workspace.guidance_config))
         return result
 
@@ -553,7 +553,7 @@ class Store:
                 command = entry.get("command")
                 args = dict(entry.get("args") or {})
                 presented_revision = args.pop("statusRevisionToken", None)
-                command_spec = page_type.command(command) if command else None
+                command_spec = get_pagetype_command(page_type, command) if command else None
                 try:
                     if command is None:
                         raise ValidationError("Unknown command None.")
@@ -893,7 +893,7 @@ class Store:
         if page_type is None:
             return {}
         workspace = self.load_workspace(workspace_id)
-        return workspace_guidance_for(page_type, page.status, workspace.guidance_config)
+        return workspace_guidance(page_type, page.status, workspace.guidance_config)
 
     # --- helpers -------------------------------------------------------------
     def _create_auto_children(

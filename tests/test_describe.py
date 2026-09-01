@@ -6,6 +6,7 @@ from src.describe import (
     describe_mutations,
     describe_page_type,
 )
+from src.pagetypes.core.pagetype import get_pagetype_command
 from src.pagetypes._registry import get_page_type
 
 # Hand-authored capability fixtures (src.testtypes), so enriching a production type never
@@ -25,15 +26,15 @@ def _counter():
 
 
 def test_command_arg_schema_has_required_and_enum():
-    set_kind = FIELDS.command("setKind")
+    set_kind = get_pagetype_command(FIELDS, "setKind")
     schema = command_arg_schema(set_kind)
     assert schema["required"] == ["statusRevisionToken", "kind"]
-    assert schema["properties"]["kind"]["enum"] == list(FIELDS.command("setKind").args[0].choices)
+    assert schema["properties"]["kind"]["enum"] == list(get_pagetype_command(FIELDS, "setKind").args[0].choices)
     assert schema["additionalProperties"] is False
 
 
 def test_command_arg_schema_optional_not_required():
-    add_item = FIELDS.command("addItem")
+    add_item = get_pagetype_command(FIELDS, "addItem")
     schema = command_arg_schema(add_item)
     assert "text" in schema["required"]
     assert "note" not in schema["required"]         # optional
@@ -42,7 +43,7 @@ def test_command_arg_schema_optional_not_required():
 def test_command_arg_schema_lists_the_revision_token_first():
     # The optimistic-concurrency stamp is presented inside args, ahead of a command's own arguments,
     # so it reads as every command's first argument - a content command and a transition alike.
-    for command in (FIELDS.command("setKind"), FLOW.command("open")):
+    for command in (get_pagetype_command(FIELDS, "setKind"), get_pagetype_command(FLOW, "open")):
         schema = command_arg_schema(command)
         assert next(iter(schema["properties"])) == "statusRevisionToken"
         assert schema["required"][0] == "statusRevisionToken"
@@ -115,16 +116,16 @@ def test_describe_mutations_is_full_catalog():
     assert by_name["setBody"]["available"] is True
 
 
-def test_describe_fsm_projects_state_guidance():
+def test_describe_fsm_projects_status_guidance():
     """The guidance rides on the FSM projection, which is how doc generation reads it."""
     described = describe_page_type(FLOW)["fsm"]
-    assert described["stateGuidance"] == {
+    assert described["statusGuidance"] == {
         "open": "open - the work is under way.\nRecord a commit with close when it is finished."
     }
     # Pre-existing keys untouched, so describePageType stays backward compatible.
     assert described["initial"] == "draft" and described["states"] == ["draft", "open", "closed"]
     # A type declaring none projects an empty mapping rather than omitting the key.
-    assert describe_page_type(get_page_type("test-blocks"))["fsm"]["stateGuidance"] == {}
+    assert describe_page_type(get_page_type("test-blocks"))["fsm"]["statusGuidance"] == {}
 
 
 def test_add_reports_its_block_argument_shape():

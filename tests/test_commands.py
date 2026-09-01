@@ -14,18 +14,11 @@ from src.commands import (
 )
 from src.errors import ConflictError, IllegalCommandError, NotFoundError, ValidationError
 from src.model import Page
-from src.pagetypes.core.specs import FSMSpec
-from src.pagetypes.core.args import (
-    ElementBlocksSpec,
-    _table_block,
-    _text,
-    add_link_cmd,
-    set_title_cmd,
-    standard_blocks,
-)
+from src.pagetypes.core.specs import FSMSpec, status_guidance
+from src.pagetypes.core.args import ElementBlocksSpec, _table_block, _text, standard_blocks
+from src.pagetypes.core.commands import add_link_cmd, set_title_cmd, blocks_cmds, list_cmds, set_prose_cmd, transition_cmd
 from src.pagetypes.core.fields import SectionSpec, _blocks, _list, _prose
-from src.pagetypes.core.commands import blocks_cmds, list_cmds, set_prose_cmd, transition_cmd
-from src.pagetypes.core.pagetype import PageType, initial_sections
+from src.pagetypes.core.pagetype import PageType, initial_sections, get_pagetype_command, get_pagetype_field
 from src.pagetypes._registry import get_page_type
 
 # Hand-authored capability fixtures (src.testtypes) - purpose-built so enriching a production
@@ -647,24 +640,24 @@ def test_is_field_setter_classifies_by_kind():
     element-scoped add - is not."""
     life = get_page_type("test-lifecycle")
     blocks = get_page_type("test-blocks")
-    assert is_field_setter(FIELDS.command("setLabel"))       # SET_SCALAR
-    assert is_field_setter(FIELDS.command("setBody"))        # SET_PROSE
-    assert is_field_setter(FIELDS.command("addItem"))        # ADD_ELEMENT
-    assert is_field_setter(life.command("askQuestion"))      # ADD_ELEMENT (element-FSM list add)
-    assert not is_field_setter(FIELDS.command("removeItem"))     # REMOVE_ELEMENT
-    assert not is_field_setter(FIELDS.command("reorderItem"))    # REORDER_ELEMENT
-    assert not is_field_setter(FIELDS.command("flagItem"))       # SET_ELEMENT_FIELD
-    assert not is_field_setter(FIELDS.command("addLink"))        # ADD_LINK
-    assert not is_field_setter(FIELDS.command("setTitle"))       # SET_TITLE
-    assert not is_field_setter(life.command("answerQuestion"))   # ELEMENT_TRANSITION
-    assert not is_field_setter(life.command("beginPlanning"))    # TRANSITION
+    assert is_field_setter(get_pagetype_command(FIELDS, "setLabel"))       # SET_SCALAR
+    assert is_field_setter(get_pagetype_command(FIELDS, "setBody"))        # SET_PROSE
+    assert is_field_setter(get_pagetype_command(FIELDS, "addItem"))        # ADD_ELEMENT
+    assert is_field_setter(get_pagetype_command(life, "askQuestion"))      # ADD_ELEMENT (element-FSM list add)
+    assert not is_field_setter(get_pagetype_command(FIELDS, "removeItem"))     # REMOVE_ELEMENT
+    assert not is_field_setter(get_pagetype_command(FIELDS, "reorderItem"))    # REORDER_ELEMENT
+    assert not is_field_setter(get_pagetype_command(FIELDS, "flagItem"))       # SET_ELEMENT_FIELD
+    assert not is_field_setter(get_pagetype_command(FIELDS, "addLink"))        # ADD_LINK
+    assert not is_field_setter(get_pagetype_command(FIELDS, "setTitle"))       # SET_TITLE
+    assert not is_field_setter(get_pagetype_command(life, "answerQuestion"))   # ELEMENT_TRANSITION
+    assert not is_field_setter(get_pagetype_command(life, "beginPlanning"))    # TRANSITION
     # A page-level blocks add is now an ordinary field setter: one add per field, so it names
     # exactly one command in `do`.
-    assert is_field_setter(blocks.command("addBody"))             # ADD_BLOCK, page-level
-    assert not is_field_setter(blocks.command("removeBlock"))     # REMOVE_BLOCK
+    assert is_field_setter(get_pagetype_command(blocks, "addBody"))             # ADD_BLOCK, page-level
+    assert not is_field_setter(get_pagetype_command(blocks, "removeBlock"))     # REMOVE_BLOCK
     element_blocks = get_page_type("test-element-blocks")
     # An element-scoped add fills an element that must exist first, so it is not a stage's work.
-    assert not is_field_setter(element_blocks.command("addItemDetail"))
+    assert not is_field_setter(get_pagetype_command(element_blocks, "addItemDetail"))
 
 
 # --- stage-scoped field-setter `do` edges (field_setter_edges) ---------------
@@ -727,7 +720,7 @@ def test_field_setter_edges_use_the_instruction_key_not_description():
         assert edge["instruction"]
         assert "description" not in edge
     # the setter's own description is the short label, and never leaks onto the edge
-    assert seal.command("setOverview").description == "set the overview"
+    assert get_pagetype_command(seal, "setOverview").description == "set the overview"
 
 
 def test_field_setter_edges_are_stage_and_legal_in_scoped():
@@ -767,7 +760,7 @@ def test_field_setter_edges_drop_blocked_events():
 # --- transition_guidance -----------------------------------------------------
 def test_transition_guidance_returns_the_entered_states_text():
     guidance = transition_guidance(FLOW, [{"command": "open"}], "open")
-    assert guidance == FLOW.fsm.guidance_for("open")
+    assert guidance == status_guidance(FLOW.fsm, "open")
     assert guidance                                  # non-empty: the fixture declares text here
 
 
@@ -1161,7 +1154,7 @@ def test_element_scoped_block_adds_are_withheld_from_the_fields_edge():
         ("items", "items", "addItem")
     ]
     # One edge, carrying the field's own instruction once.
-    assert edges[0]["instruction"] == ELEMENT_BLOCKS.field_spec("items", "items").description
+    assert edges[0]["instruction"] == get_pagetype_field(ELEMENT_BLOCKS, "items", "items").description
 
 
 CHILD_BLOCKS = get_page_type("test-child")

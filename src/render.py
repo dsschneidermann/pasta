@@ -10,7 +10,7 @@ from typing import Any
 
 from .model import Page, Workspace
 from .pagetypes.core.specs import BLOCKS, LIST, PROSE, SCALAR, ElementFSMSpec
-from .pagetypes.core.fields import FieldSpec
+from .pagetypes.core.fields import FieldSpec, block_element_fields
 from .pagetypes.core.pagetype import PageType
 from .pagetypes._registry import get_page_type
 
@@ -123,7 +123,7 @@ def _indent_list_content(markdown: str) -> str:
 def _render_list(elements: list[dict[str, Any]], field_spec: FieldSpec | None = None,
                  ref_context: RefContext | None = None) -> str | None:
     element_fsm = field_spec.element_fsm if field_spec is not None else None
-    block_fields = field_spec.block_element_fields() if field_spec is not None else ()
+    block_fields = block_element_fields(field_spec) if field_spec is not None else ()
     lines: list[str] = []
     for element in elements:
         # A block-bearing field is rendered below the bullet, never flattened into it.
@@ -465,7 +465,7 @@ def page_text(page: Page, page_type: PageType) -> str:
                     if field_spec.kind == BLOCKS:
                         parts.append(_block_inline_text(entry))
                     # an element's block fields carry their text one level deeper again
-                    for block_field in field_spec.block_element_fields():
+                    for block_field in block_element_fields(field_spec):
                         for block in entry.get(block_field) or []:
                             if not isinstance(block, dict):
                                 continue

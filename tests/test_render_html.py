@@ -4,7 +4,7 @@ from src.commands import apply_command, create_page
 from src.model import Page
 from src.pagetypes.core.specs import LIST, SCALAR, FSMSpec
 from src.pagetypes.core.fields import FieldSpec
-from src.pagetypes.core.pagetype import PageType
+from src.pagetypes.core.pagetype import PageType, get_pagetype_field
 from src.pagetypes._registry import get_page_type
 from src.render import RefContext
 from src.render_html import (_children_html, _field_html, _list_html, _references_html,
@@ -17,7 +17,7 @@ BLOCKS_TYPE = get_page_type("test-blocks")
 
 
 def _spec(page_type, section, field):
-    return page_type.field_spec(section, field)
+    return get_pagetype_field(page_type, section, field)
 
 
 def _counter():

@@ -22,6 +22,7 @@ from .commands import transition_guidance
 from .describe import describe_mutations, describe_page_type
 from .errors import PastaError
 from .hmr_live_refresh import ws_reloader
+from .pagetypes.core.specs import status_guidance
 from .pagetypes._registry import get_page_type, registered_tags, validate_registry
 from .render import escape_markdown, render_workspace_links
 from .render_html import md2html
@@ -471,7 +472,7 @@ async def createPage(workspaceId: str, type: str, title: str, parentId: str | No
             "next": next_actions,
         }
         # Creating a page enters a state, so its initial guidance echoes here too.
-        guidance = page_type.fsm.guidance_for(page.status) if page_type is not None else None
+        guidance = status_guidance(page_type.fsm, page.status) if page_type is not None else None
         if guidance is not None:
             response["guidance"] = guidance
         response.update(STORE.page_workspace_guidance(workspaceId, page))

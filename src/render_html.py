@@ -18,7 +18,7 @@ from wenmode.presets import github
 
 from .model import Page
 from .pagetypes.core.specs import BLOCKS, LIST, PROSE, SCALAR
-from .pagetypes.core.fields import FieldSpec, SectionSpec
+from .pagetypes.core.fields import FieldSpec, SectionSpec, block_element_fields, title_element_field
 from .pagetypes.core.pagetype import PageType
 from .render import RefContext, checkbox_state, render_blocks
 
@@ -79,10 +79,10 @@ def element_view(element: dict[str, Any], index: int, field_spec: FieldSpec) -> 
     values are - a list whose type declares neither is headed by its ordinal alone."""
     declared = field_spec.element_fields or ()
     # A block-bearing field is neither a heading nor a plain row - it has its own tuple.
-    block_fields = field_spec.block_element_fields()
+    block_fields = block_element_fields(field_spec)
     # The declared heading field, consumed by the heading and never repeated as a row - so a
     # field's row set is fixed by its declaration and does not move with an author's edits.
-    title_key = field_spec.title_element_field()
+    title_key = title_element_field(field_spec)
     # Declared order first, then any stored key the type does not declare, so nothing on the
     # element is hidden. `id` is structural and `status` has its own chip.
     extra = [key for key in element if key not in ("id", "status") and key not in declared]

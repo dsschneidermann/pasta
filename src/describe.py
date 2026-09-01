@@ -12,7 +12,8 @@ from typing import Any
 from .commands import legal_commands
 from .model import Page
 from .pagetypes.core.specs import BLOCKS, BLOCK_ARRAY, COMPOUND, TRANSITION
-from .pagetypes.core.args import BlockKindSpec, CommandSpec
+from .pagetypes.core.args import BlockKindSpec
+from .pagetypes.core.commands import CommandSpec
 from .pagetypes.core.pagetype import PageType
 
 
@@ -25,10 +26,10 @@ def _block_schema(block_kinds: tuple[BlockKindSpec, ...]) -> dict[str, Any]:
     for block in block_kinds:
         properties: dict[str, Any] = {"kind": {"const": block.kind}}
         required = ["kind"]
-        for body in block.body_args():
-            properties[body.name] = {"type": body.type}
-            if body.required:
-                required.append(body.name)
+        for arg in block.body_args:
+            properties[arg.name] = {"type": arg.type}
+            if arg.required:
+                required.append(arg.name)
         branches.append({"type": "object", "properties": properties,
                          "required": required, "additionalProperties": False})
     return {"oneOf": branches}
@@ -97,7 +98,7 @@ def describe_fsm(page_type: PageType) -> dict[str, Any]:
             for event, source, dest, agency in page_type.fsm.transitions
         ],
         # A dict is safe here - a projection, unlike the FSMSpec, which must stay hashable.
-        "stateGuidance": dict(page_type.fsm.state_guidance),
+        "statusGuidance": dict(page_type.fsm.status_guidance),
     }
 
 

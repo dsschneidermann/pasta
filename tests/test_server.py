@@ -316,7 +316,7 @@ def test_two_transitions_in_one_batch_are_rejected(mcp):
     assert call(mcp, "getPage", {"workspaceId": workspace_id, "pageId": page_id})["status"] == "draft"
 
 
-def test_create_page_echoes_initial_state_guidance_and_children_do_not(mcp):
+def test_create_page_echoes_initial_status_guidance_and_children_do_not(mcp):
     workspace = call(mcp, "createWorkspace", {"name": "guidance"})
     workspace_id = workspace["id"]
 

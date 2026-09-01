@@ -12,8 +12,9 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 from ...errors import ValidationError
-from .args import ArgSpec, CommandSpec
-from .fields import FieldSpec, SectionSpec
+from .args import ArgSpec
+from .commands import CommandSpec
+from .fields import FieldSpec, SectionSpec, get_element_blocks
 from .specs import (
     ADD_ELEMENT,
     BLOCKS,
@@ -43,7 +44,7 @@ class PageType:
 
     def __post_init__(self):
         self._resolve_block_vocabularies()
-        object.__setattr__(self.fsm, "transitions", status_transitions(self))
+        object.__setattr__(self.fsm, "transitions", _status_transitions(self))
 
     def _resolve_block_vocabularies(self) -> None:
         """Fill each block-carrying argument's accepted kinds in from the field it targets.
@@ -69,7 +70,7 @@ class PageType:
             return arg
         if command.section is None or command.field is None:
             return arg
-        field_spec = self.field_spec(command.section, command.field)
+        field_spec = get_pagetype_field(self, command.section, command.field)
         if field_spec is None:
             return arg
         # A list add carries one block argument per block-bearing element field, named after
@@ -80,27 +81,29 @@ class PageType:
             if field_spec.kind != BLOCKS:
                 return arg
             return replace(arg, block_kinds=field_spec.block_kinds)
-        element_blocks = field_spec.element_blocks_spec(element_field)
+        element_blocks = get_element_blocks(field_spec, element_field)
         if element_blocks is None:
             return arg
         return replace(arg, block_kinds=element_blocks.block_kinds)
 
-    def command(self, name: str) -> CommandSpec | None:
-        for command in self.commands:
-            if command.name == name:
-                return command
-        return None
 
-    def field_spec(self, section_key: str, field_key: str) -> FieldSpec | None:
-        for section in self.sections:
-            if section.key == section_key:
-                for field_spec in section.fields:
-                    if field_spec.key == field_key:
-                        return field_spec
-        return None
+def get_pagetype_command(self: PageType, name: str) -> CommandSpec | None:
+    for command in self.commands:
+        if command.name == name:
+            return command
+    return None
 
 
-def status_transitions(page_type: PageType) -> tuple[tuple[str, str, str, str], ...]:
+def get_pagetype_field(self: PageType, section_key: str, field_key: str) -> FieldSpec | None:
+    for section in self.sections:
+        if section.key == section_key:
+            for field_spec in section.fields:
+                if field_spec.key == field_key:
+                    return field_spec
+    return None
+
+
+def _status_transitions(page_type: PageType) -> tuple[tuple[str, str, str, str], ...]:
     """The page's status-FSM transition table, DERIVED from its transition/compound commands.
 
     Each top-level command with a page-status event (kind TRANSITION or COMPOUND, `event` set) owns one
