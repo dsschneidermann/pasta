@@ -40,4 +40,4 @@ sphinx:
     --pre-build 'uv run python scripts/gen_page_type_docs.py'
 
 [parallel]
-dev: main klaus sphinx
+dev: main sphinx
