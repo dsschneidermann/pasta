@@ -8,7 +8,7 @@ role:
                          required + optional element field) and the content-mutation patterns over
                          them (set, add + positioned insert, remove, reorder, set-element-field).
   - ``test-blocks``    - the ``blocks`` field: every block kind, the inline-run grammar, in-place
-                         set, reorder, remove; a single terminal ``active`` state.
+                         set, reorder, remove; a single terminal ``active`` status.
   - ``test-element-blocks`` - block-bearing element fields: a list whose elements carry blocks
                          under a per-field kind restriction (``snippet`` code-only, ``detail``
                          paragraph/code/list), an element FSM, and a draft→ready FSM whose
@@ -19,7 +19,7 @@ role:
                          that share the name ``open``, and a COMPOUND ``close`` that records a
                          commit AND transitions.
   - ``test-lifecycle`` - a rich status FSM: required-content preconditions, agency, a multi-source
-                         ``abandon`` to a terminal state, a questions element-FSM + escalate, a
+                         ``abandon`` to a terminal status, a questions element-FSM + escalate, a
                          pinned auto-child, a ``beginImplementation`` guarded on that child's page
                          status (page-status guard), and a ``ship`` guarded on that child's element
                          states (element-status guards).
@@ -118,7 +118,7 @@ _QUESTION_FSM = ElementFSMSpec(
 # test-fields - every non-block field kind + the content-mutation patterns.
 # scalar (plain), scalar (enum), prose, and a plain list (multi element fields, one optional,
 # no element FSM). Commands cover set_scalar, set_prose, add_element (append + positioned insert),
-# remove_element, reorder_element, and set_element_field (a boolean const). Single `active` state:
+# remove_element, reorder_element, and set_element_field (a boolean const). Single `active` status:
 # this fixture has no lifecycle of its own - it is purely a content surface.
 # ============================================================================
 TEST_FIELDS = PageType(
@@ -154,7 +154,7 @@ TEST_FIELDS = PageType(
 # The richest content surface, in four commands: one add taking an array of kinded blocks, one
 # generalized set replacing any block whatever its kind, plus reorder, remove and positioned
 # insert. The field declares no vocabulary, so it accepts every standard kind. Single terminal
-# `active` state (also the single-state / terminal case for render and reachable_states).
+# `active` status (also the single-state / terminal case for render and reachable_states).
 # ============================================================================
 TEST_BLOCKS = PageType(
     tag="test-blocks",
@@ -215,7 +215,7 @@ TEST_ELEMENT_BLOCKS = PageType(
 # test-flow - the simple status FSM: draft -> open -> closed, closed -> open.
 # The `open` STATE and the `open` EVENT deliberately share a name (the FSM engine must handle
 # this). `close` is a COMPOUND that records a commit AND fires the transition, atomically.
-# `closed` is declared TERMINAL yet keeps its `reopen` edge - the fixture for the terminal-state
+# `closed` is declared TERMINAL yet keeps its `reopen` edge - the fixture for the terminal-status
 # authoring lock's "transitions still allowed if any" branch (authoring locked, reopen still legal)
 # and for the `legal_in` override of it - `reorderCommit` names `closed` and stays legal there.
 # ============================================================================
@@ -259,8 +259,8 @@ TEST_FLOW = PageType(
 
 # ============================================================================
 # test-lifecycle - the rich status FSM: required-content preconditions on transitions, agency
-# variety (agent / human / either), a multi-source `abandon` OR-combined to a terminal state,
-# terminal states, a questions element-FSM + escalate (feeds `attention`), a pinned auto-child,
+# variety (agent / human / either), a multi-source `abandon` OR-combined to a terminal status,
+# terminal statuses, a questions element-FSM + escalate (feeds `attention`), a pinned auto-child,
 # a `beginImplementation` guarded on that child's page status (a page-status ChildStateGuard),
 # and `submitForReview` + `ship` guarded on that child's element states (element-status
 # ChildStateGuards whose allowed set accepts done/passed or skipped).
@@ -329,8 +329,8 @@ TEST_LIFECYCLE = PageType(
     ),
     # On createPage, create the pinned child in the same commit; author into it.
     auto_children=(AutoChildSpec("test-child"),),
-    # Workspace-guidance fields for the tests: one shown across two states, one at a single state,
-    # and one at the initial state.
+    # Workspace-guidance fields for the tests: one shown across two statuses, one at a single status,
+    # and one at the initial status.
     workspace_guidance=(
         WorkspaceGuidanceSpec("buildTool", ("building", "review"), "the build tool this workspace uses"),
         WorkspaceGuidanceSpec("reviewHint", ("review",), "a hint shown while reviewing"),
@@ -439,7 +439,7 @@ TEST_CHILD = PageType(
         name="TestChild",
         initial="draft",
         states=("draft", "ready"),
-        # A guided initial state, which is what makes createPage's echo testable.
+        # A guided initial status, which is what makes createPage's echo testable.
         status_guidance=(("draft", "draft - write the steps and checks here."),),
     ),
 )

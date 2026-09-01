@@ -52,7 +52,7 @@ class CommandSpec:
     field: str | None = None
     args: tuple[ArgSpec, ...] = ()
     event: str | None = None                    # FSM event for TRANSITION / COMPOUND
-    # for TRANSITION / COMPOUND: the destination state. Paired with `legal_in` (the source state(s)),
+    # for TRANSITION / COMPOUND: the destination status. Paired with `legal_in` (the source status(es)),
     # this is the single home for a status edge - `_status_transitions(page_type)` derives the whole
     # page FSM table from these.
     dest: str | None = None
@@ -74,14 +74,14 @@ class CommandSpec:
     requires: tuple[tuple[str, str], ...] = ()
     # Where this command is legal (None = any status). The uniform "where-legal" declaration:
     #   - content command: the statuses it may run in (a status-scoped lock);
-    #   - TRANSITION / COMPOUND: the SOURCE state(s) of the edge (paired with `dest`), from which the
+    #   - TRANSITION / COMPOUND: the SOURCE status(es) of the edge (paired with `dest`), from which the
     #     page FSM table is derived. Not surfaced in the command summary for transitions (the source
     #     is already reported via the derived FSM transition list), so describe output is unchanged.
     legal_in: tuple[str, ...] | None = None
     # cross-page integrity check / transition guard (evaluated in the store)
     ref_check: RefCheck | None = None
     guards: tuple[ChildStateGuard, ...] = ()
-    # cross-page guard over the PARENT's state (evaluated in the store) - see ParentStateGuard
+    # cross-page guard over the PARENT's status (evaluated in the store) - see ParentStateGuard
     parent_guards: tuple[ParentStateGuard, ...] = ()
     agency: str = "agent"                       # "agent" | "human" | "either" (informational this pass)
     generated: bool = False
@@ -340,9 +340,9 @@ def transition_cmd(name: str, description: str, *, legal_in: tuple[str, ...] | N
     """A page-status TRANSITION command whose `description` carries the edge as 'from -> to'. A written
     '->' is substituted once to the arrow glyph '→', which the edge is then split on. The dest is the
     first word after the arrow - a trailing parenthetical is ignored (so 'a -> b (note)' resolves to
-    b) - and is NOT overridable; it names the destination state. The source is the text before the
+    b) - and is NOT overridable; it names the destination status. The source is the text before the
     arrow, which `legal_in` overrides (for a multi-source edge, or one whose 'from' is prose rather
-    than a state name). `event` defaults to `name` (every transition fires an event of its own name)."""
+    than a status name). `event` defaults to `name` (every transition fires an event of its own name)."""
     description = description.replace("->", "→")
     before, arrow, after = description.partition("→")
     words = after.split()
@@ -399,7 +399,7 @@ def set_title_cmd() -> CommandSpec:
     renamePage tool, exposed as a page command (like add_link_cmd's addLink) so a title can be fixed in
     the same authoring surface (describeMutations / mutatePageBatch) as the content it describes. Added to
     every authorable page type EXCEPT the command-less toc. Always legal - no legal_in / requires - so it
-    runs in any status (locked only in a terminal state, as all authoring is). The pure core sets
+    runs in any status (locked only in a terminal status, as all authoring is). The pure core sets
     Page.title after rejecting a blank title, exactly as renamePage does."""
     return CommandSpec(
         name="setTitle",

@@ -659,11 +659,11 @@ class Store:
 
     # --- direct status override ---------------------------------------------
     def set_page_status(self, workspace_id: str, page_id: str, status: str) -> Page:
-        """Set a page's lifecycle status directly to any valid state of its type's FSM, bypassing
-        the modelled transition guards. This is a human admin override (the web page view's state
-        dropdown), not a modelled FSM edge - it exists so a person can correct a page's state from
+        """Set a page's lifecycle status directly to any valid status of its type's FSM, bypassing
+        the modelled transition guards. This is a human admin override (the web page view's status
+        dropdown), not a modelled FSM edge - it exists so a person can correct a page's status from
         the browser. Rejects a missing page, an unregistered type, and a status that isn't one of
-        the type's declared FSM states. Returns the updated page.
+        the type's declared statuses. Returns the updated page.
         """
         with self._transaction_lock_for(workspace_id):
             workspace = self.load_workspace(workspace_id)
@@ -675,8 +675,8 @@ class Store:
                 raise PastaError(f"Page '{page_id}' has unregistered type '{page.type}'.")
             if not fsm.is_valid_status(page_type.fsm, status):
                 raise ValidationError(
-                    f"'{status}' is not a valid state for page type '{page.type}'. " +
-                    f"Valid states: {', '.join(page_type.fsm.states)}."
+                    f"'{status}' is not a valid status for page type '{page.type}'. " +
+                    f"Valid statuses: {', '.join(page_type.fsm.states)}."
                 )
             page.status = status
             # A direct status edit regenerates the stamp too, so an out-of-band move invalidates held tokens.
@@ -770,7 +770,7 @@ class Store:
         reserve them either): a title is a display label, never an identifier (pages are addressed
         only by id), so a duplicate cannot dangle a reference or break a lookup. Rejects a missing
         page and a blank title; permitted on archived and pinned pages, since a rename alters no tree
-        structure or lifecycle state. Returns the renamed page.
+        structure or lifecycle status. Returns the renamed page.
         """
         if not title or not title.strip():
             raise ValidationError("Page title must be a non-empty string.")

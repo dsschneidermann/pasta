@@ -149,7 +149,7 @@ _FEATURE_BRIEF = PageType(
                 not reopened during the build.
                 """),
         )),
-        # The plan review's outcome (populated in the `planReview` state): a verdict plus a summary
+        # The plan review's outcome (populated in the `planReview` status): a verdict plus a summary
         # of the findings the review raised. The findings themselves must also be applied as edits.
         SectionSpec("review", "Plan review", (
             _scalar("verdict", choices=_VERDICTS, description="""
@@ -202,7 +202,7 @@ _FEATURE_BRIEF = PageType(
             ("answerQuestion", "answer", "answer a question (open -> answered)", (_text("answer"),)),)),
         set_element_field_cmd("questions", name="escalateQuestion",
                               description="flag a question as awaiting a human", const=("needsHuman", True)),
-        # Plan-review recording - legal only in the `planReview` state, where the authored plan is
+        # Plan-review recording - legal only in the `planReview` status, where the authored plan is
         # reviewed before any code is written. `approvePlan` (planReview -> building) requires a
         # verdict to have been recorded first (see its `requires=` below).
         set_scalar_cmd("review", "verdict", name="setReviewVerdict", choices=_VERDICTS,

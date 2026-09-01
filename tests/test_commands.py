@@ -496,7 +496,7 @@ def test_abandon_reaches_abandoned_from_multiple_states():
     factory = make_counter()
     # From draft.
     assert apply_command(new_life(factory), LIFE, "abandon", {}, factory).page.status == "abandoned"
-    # From building (an event with several source states, OR-combined in the FSM).
+    # From building (an event with several source statuses, OR-combined in the FSM).
     page = apply_command(new_life(factory), LIFE, "setSummary", {"text": "x"}, factory).page
     page = apply_command(page, LIFE, "beginPlanning", {}, factory).page
     page = apply_command(page, LIFE, "addPart", {"name": "R"}, factory).page

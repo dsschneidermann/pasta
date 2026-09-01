@@ -305,7 +305,7 @@ _AGENT_PLAN = PageType(
                 the controller can verify before accepting a dispatch: which of the brief's own
                 commands must have been run, what status the brief and its plans must be left in,
                 and where the agent's full written report lives. An agent reports by driving its own
-                brief, not by handing prose back, so name the page state you expect rather than the
+                brief, not by handing prose back, so name the page status you expect rather than the
                 summary you want to read. Accepting a dispatch without this check is how a
                 workstream comes to be believed done while its brief still says otherwise.
                 """),

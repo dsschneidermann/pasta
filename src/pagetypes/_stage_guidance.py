@@ -1,12 +1,12 @@
-"""The stage instructions a page type hands an agent on entering a state.
+"""The stage instructions a page type hands an agent on entering a status.
 
 A page type declares these on its FSM as `status_guidance`. They live here rather than
 inline so one working discipline can reach several page types, and so the text can be
 read and revised as prose instead of between a page type's sections and commands. The
 leading underscore sorts this module above every page-type module that draws on it.
 
-A constant is named for its state. A bare name is the only text for that state anywhere;
-a name carrying a page-type prefix is one type's own take on a state name that several
+A constant is named for its status. A bare name is the only text for that status anywhere;
+a name carrying a page-type prefix is one type's own take on a status name that several
 types claim.
 
 Text is authored indented and normalized by `FSMSpec.__post_init__`, which dedents and
@@ -16,7 +16,7 @@ strips it exactly as it does a field description.
 
 # --- feature-brief -----------------------------------------------------------
 GROUNDING = """
-grounding - the summary is written and nothing else is known yet. This state is for
+grounding - the summary is written and nothing else is known yet. This status is for
 reading the real repository and recording what is actually there. The work of it:
 
 - Find the code this feature touches and read it: the function, the file, the
@@ -28,7 +28,7 @@ reading the real repository and recording what is actually there. The work of it
 - Follow callers and imports outward until the blast radius stops growing, and note
   as you go which components hold pure logic and which perform effects.
 - Turn whatever reading could not settle into a question rather than an assumption.
-  An unsurfaced assumption is the most expensive thing to carry out of this state.
+  An unsurfaced assumption is the most expensive thing to carry out of this status.
 
 No code is edited here and no design is started. If the summary turns out to be
 wrong or underspecified once you can see the code, say so now, while nothing has
@@ -85,7 +85,7 @@ sealed.
 
 PLAN_REVIEW = """
 plan-review - the plan is written, and this is the last point at which fixing it is
-still cheap. This state is for reading the plan against the spec, not for building.
+still cheap. This status is for reading the plan against the spec, not for building.
 The work of it:
 
 - Check every spec requirement against a step that delivers it, and every step
@@ -137,7 +137,7 @@ improvisation. Record each commit as you make it.
 
 FEATURE_BRIEF_REVIEW = """
 review - the build is done, and this is the last stop before the human ship gate.
-This state is for verifying, not for finishing off. The work of it:
+This status is for verifying, not for finishing off. The work of it:
 
 - Re-read the spec's design section and confirm every requirement it states is
   actually implemented, not merely planned.
@@ -154,7 +154,7 @@ This state is for verifying, not for finishing off. The work of it:
   previous implementation. Uppercase words and emphasis markers are inappropriate in
   tone and single line comments that are self-evident by code should be removed.
 
-Three things are deliberately not part of this state, so do not start them here:
+Three things are deliberately not part of this status, so do not start them here:
 rebasing onto main happens at ship, not before; recording commits happens after ship,
 once the shas are final; and reconciling the documentation pages the brief named as
 going stale also happens at ship.
@@ -167,7 +167,7 @@ rather than ship with a known gap.
 # --- simple-change and bug-report, shared ------------------------------------
 REVIEW = """
 review - the work is written, and this is the last stop before it is marked done and
-left for the human close gate. This state is for verifying, not for finishing off. The
+left for the human close gate. This status is for verifying, not for finishing off. The
 work of it:
 
 - Re-read what the page said the work was and confirm every part of it is actually
@@ -185,7 +185,7 @@ work of it:
   previous implementation. Uppercase words and emphasis markers are inappropriate in
   tone and single line comments that are self-evident by code should be removed.
 
-Two things are deliberately not part of this state: rebasing onto main happens at
+Two things are deliberately not part of this status: rebasing onto main happens at
 close, not before, and the commit is recorded by close itself, so there is nothing to
 record here. If any of this turns up outstanding work, use requestChanges to go back to
 open rather than mark it done with a known gap.
@@ -194,7 +194,7 @@ open rather than mark it done with a known gap.
 
 # --- simple-change -----------------------------------------------------------
 SIMPLE_CHANGE_DRAFT = """
-draft - the change has been asked for and nothing is written down yet. This state is
+draft - the change has been asked for and nothing is written down yet. This status is
 for saying what changes and why, precisely enough that someone else could start from
 the page alone. The work of it:
 
@@ -214,13 +214,13 @@ codebase start work from it.
 """
 
 SIMPLE_CHANGE_OPEN = """
-open - the change is described, and this one state carries it from reading the code to
+open - the change is described, and this one status carries it from reading the code to
 a change that works. There is no separate grounding, spec or planning stage here, so
 the discipline those would enforce has to be kept in this one. The work of it:
 
 - Read the code the change touches before editing it: the function, its callers, why
   it exists. Follow callers and imports outward until the blast radius stops growing.
-  A change made against a guess is what this state exists to prevent.
+  A change made against a guess is what this status exists to prevent.
 - Keep it the size it was scoped at. If the reading shows the work spans components,
   needs a design settled first, or wants a plan, raise that rather than let a simple
   change grow into an unplanned feature.
@@ -243,7 +243,7 @@ is intended.
 
 # --- bug-report --------------------------------------------------------------
 BUG_REPORT_DRAFT = """
-draft - a defect has been noticed and the report does not exist yet. This state is for
+draft - a defect has been noticed and the report does not exist yet. This status is for
 making it reproducible by someone who was not there. The work of it:
 
 - Name the symptom you can observe, specific enough to tell this defect from a similar
@@ -264,7 +264,7 @@ could reproduce the defect from the page alone.
 """
 
 BUG_REPORT_OPEN = """
-open - the report is written, and this one state carries the defect from reproducing it
+open - the report is written, and this one status carries the defect from reproducing it
 to a fix that holds. There is no separate grounding, spec or planning stage here, so
 the discipline those would enforce has to be kept in this one. The work of it:
 

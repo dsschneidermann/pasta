@@ -152,7 +152,7 @@ def test_generated_docs_do_not_repeat_the_instruction_under_every_setter():
 
 # --- per-state guidance on the generated page --------------------------------
 def test_state_page_opens_with_its_status_guidance():
-    # The text an agent gets on entering a state is the text a human reads on its page.
+    # The text an agent gets on entering a status is the text a human reads on its page.
     guidance = status_guidance(get_page_type("feature-brief").fsm, "review")
     assert guidance                                        # one of the documented states
     docs = state_docs(get_page_type("feature-brief"))

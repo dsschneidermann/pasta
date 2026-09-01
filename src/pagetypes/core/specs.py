@@ -69,20 +69,20 @@ _MARKDOWN_TOKENS = ("**", "`", "](")
 # --- Spec dataclasses --------------------------------------------------------
 @dataclass(frozen=True)
 class FSMSpec:
-    """A page's status FSM: its state set and initial state ONLY.
+    """A page's status FSM: its status set and initial status ONLY.
 
     The transition table is NOT stored here - it is DERIVED from the page type's transition/compound
-    commands by `_status_transitions(page_type)`, where each such command declares its source state(s)
+    commands by `_status_transitions(page_type)`, where each such command declares its source status(es)
     via `legal_in=` and its destination via `dest=`. So a status edge lives in exactly one place (the
     command), and `legal_in` is the uniform "where is this command legal" declaration across every
     command kind. (Element lifecycles are a separate concept - see `ElementFSMSpec`.)
 
-    `terminal_states` names states in which the work is finished. While a page sits in one, `legal_commands`
+    `terminal_states` names statuses in which the work is finished. While a page sits in one, `legal_commands`
     locks every authoring command (describeMutations reports them unavailable; mutatePageBatch rejects
-    them) - but any remaining status transitions stay legal, so a terminal state can still offer, e.g., a
-    `reopen` edge. This is an explicit declaration, NOT inferred from a state merely lacking outgoing
-    transitions: only states listed here are authoring-locked. An authoring command can opt out by naming
-    the terminal state in `legal_in`.
+    them) - but any remaining status transitions stay legal, so a terminal status can still offer, e.g., a
+    `reopen` edge. This is an explicit declaration, NOT inferred from a status merely lacking outgoing
+    transitions: only statuses listed here are authoring-locked. An authoring command can opt out by naming
+    the terminal status in `legal_in`.
 
     `status_guidance` is the per-status stage instruction: what a page in that status is for and
     what the work in it consists of. It is a tuple of `(status, text)` pairs, not a mapping,
@@ -98,10 +98,10 @@ class FSMSpec:
 
     def __post_init__(self):
         # Setup only: normalize each guidance text as authored (dedent a
-        # newline-stripped block, then rstrip). The state names are checked by
+        # newline-stripped block, then rstrip). The status names are checked by
         # validate_fsm_spec, not here.
-        normalized = tuple((state, dedent(text.strip("\n")).rstrip())
-                           for state, text in self.status_guidance)
+        normalized = tuple((status, dedent(text.strip("\n")).rstrip())
+                           for status, text in self.status_guidance)
         object.__setattr__(self, "status_guidance", normalized)
 
 
@@ -149,7 +149,7 @@ class RefCheck:
 
 @dataclass(frozen=True)
 class ChildStateGuard:
-    """A cross-page transition guard over the state of a page's children, evaluated in the store.
+    """A cross-page transition guard over the status of a page's children, evaluated in the store.
 
     For every child page of type `child_type`, in one of two forms:
     - element form (`section`/`field` given): every element in that list field must have a status
@@ -168,7 +168,7 @@ class ChildStateGuard:
 
 @dataclass(frozen=True)
 class ParentStateGuard:
-    """A cross-page transition guard over the state of a page's PARENT, evaluated in the store.
+    """A cross-page transition guard over the status of a page's PARENT, evaluated in the store.
 
     The parent page's own status must be one of `required_statuses`, otherwise the transition is
     rejected with `message`. The mirror image of `ChildStateGuard` (which looks down at children):

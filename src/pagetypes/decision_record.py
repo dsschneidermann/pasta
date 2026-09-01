@@ -97,7 +97,7 @@ _DECISION_RECORD = PageType(
             remove_name="removeConsequence", remove_desc="remove a consequence",
             reorder_name="reorderConsequence",
             reorder_desc="move a consequence to an anchored position (precedingId guards a stale read)"),
-        # The one authoring command that opts back into the terminal state: a record is
+        # The one authoring command that opts back into the terminal status: a record is
         # overtaken by a later one long after it was accepted.
         set_scalar_cmd("relations", "supersededBy", label="superseding record",
                        legal_in=("authoring", "accepted")),

@@ -115,17 +115,17 @@ def test_fsm_is_well_formed(tag: str):
 
 @pytest.mark.parametrize("tag", list(ALL_TYPES))
 def test_transition_commands_declare_source_and_dest(tag: str):
-    """The single-home rule: every transition/compound command declares its source state(s) via
+    """The single-home rule: every transition/compound command declares its source status(es) via
     legal_in and a real destination via dest, and no command maps one event to two different dests."""
     page_type = ALL_TYPES[tag]
     states = set(page_type.fsm.states)
     event_dests: dict[str, str] = {}
     for command in page_type.commands:
         if command.kind in (TRANSITION, COMPOUND) and command.event is not None:
-            assert command.legal_in, f"{tag}.{command.name} has no legal_in source state(s)"
-            assert command.dest in states, f"{tag}.{command.name} dest {command.dest} not a state"
+            assert command.legal_in, f"{tag}.{command.name} has no legal_in source status(es)"
+            assert command.dest in states, f"{tag}.{command.name} dest {command.dest} not a status"
             for source in command.legal_in:
-                assert source in states, f"{tag}.{command.name} source {source} not a state"
+                assert source in states, f"{tag}.{command.name} source {source} not a status"
             prior = event_dests.setdefault(command.event, command.dest)
             assert prior == command.dest, \
                 f"{tag}: event {command.event} maps to two dests ({prior}, {command.dest})"
@@ -413,7 +413,7 @@ def test_blocks_body_is_an_inline_run_blocks_field():
 def test_element_fsms_declare_checkmark_done():
     """The checkbox mapping lives on the element FSM (ElementFSMSpec): checkmark_done names the [x]
     state, `initial` is the [ ] state, and an element FSM without checkmark_done renders no box. A
-    page-status FSMSpec has no checkmark_done at all - page states are never checkboxes."""
+    page-status FSMSpec has no checkmark_done at all - page statuses are never checkboxes."""
     step_fsm = get_pagetype_field(CHILD, "steps", "items").element_fsm
     check_fsm = get_pagetype_field(CHILD, "checks", "items").element_fsm
     question_fsm = get_pagetype_field(LIFE, "questions", "items").element_fsm
@@ -506,13 +506,13 @@ def test_status_guidance_returns_none_for_undeclared_state():
     assert status_guidance(spec, "a") is None
 
 
-def test_status_guidance_rejects_unknown_state():
-    # A typo in a state name is reported by the validator, not silently never appearing.
+def test_status_guidance_rejects_unknown_status():
+    # A typo in a status name is reported by the validator, not silently never appearing.
     fsm = FSMSpec(name="G", initial="a", states=("a",), status_guidance=(("nope", "x"),))
-    assert any("unknown state" in error for error in validate_fsm_spec(fsm))
+    assert any("unknown status" in error for error in validate_fsm_spec(fsm))
 
 
-def test_status_guidance_rejects_duplicate_state():
+def test_status_guidance_rejects_duplicate_status():
     fsm = FSMSpec(name="G", initial="a", states=("a",),
                   status_guidance=(("a", "x"), ("a", "y")))
     assert any("twice" in error for error in validate_fsm_spec(fsm))
@@ -1023,7 +1023,7 @@ def test_validate_page_types_aggregates_every_defect_into_one_raise():
         validate_page_types({broken.tag: broken})
     message = str(exc.value)
     assert "two field setters" in message
-    assert "unknown state" in message
+    assert "unknown status" in message
     assert "xtest-broken:" in message
 
 

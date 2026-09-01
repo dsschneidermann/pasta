@@ -164,11 +164,11 @@ async def route_page(request: Request, workspaceIdPart: str, pageId: str, archiv
                 # Drives the Archive/Unarchive button at the bottom of the page (see page.html).
                 "page_id": page.id,
                 "archived": page.archived,
-                # Drives the state dropdown next to the Archive button: every FSM state of this
+                # Drives the status dropdown next to the Archive button: every status of this
                 # page's type, with the current one preselected.
                 "statuses": page_type.fsm.states if page_type is not None else (),
                 "status": page.status,
-                # The Model overlay loads the docsite page for the page's type AND current state.
+                # The Model overlay loads the docsite page for the page's type AND current status.
                 "page_type_doc": f"{page.type}-{page.status}",
             },
         )
@@ -196,9 +196,9 @@ async def route_unarchive_page(workspaceIdPart: str, pageId: str):
         return PlainTextResponse(status_code=202)
 
 
-# Directly set a page's lifecycle state from its web view. Backs the state dropdown + Apply button
+# Directly set a page's lifecycle status from its web view. Backs the status dropdown + Apply button
 # next to the Archive control (see page.html): a deliberate FSM-bypassing admin override, so a human
-# can force any of the type's declared states. `status` arrives as a form field. Like the archive
+# can force any of the type's declared statuses. `status` arrives as a form field. Like the archive
 # routes it fires the live-reload refresh and 202s (no MCP equivalent - a browser can't call MCP).
 @app.post("/ws:{workspaceIdPart}/page/{pageId}/status", response_class=PlainTextResponse)
 async def route_set_page_status(workspaceIdPart: str, pageId: str, status: str = Form(...)):
@@ -471,7 +471,7 @@ async def createPage(workspaceId: str, type: str, title: str, parentId: str | No
             ],
             "next": next_actions,
         }
-        # Creating a page enters a state, so its initial guidance echoes here too.
+        # Creating a page enters a status, so its initial guidance echoes here too.
         guidance = status_guidance(page_type.fsm, page.status) if page_type is not None else None
         if guidance is not None:
             response["guidance"] = guidance
@@ -504,7 +504,7 @@ async def mutatePageBatch(
             "createdIds": created,
             "next": next_actions,
         }
-        # The stage guidance for a state just entered, beside `next`.
+        # The stage guidance for a status just entered, beside `next`.
         guidance = (transition_guidance(page_type, commands, page.status)
                     if page_type is not None else None)
         if guidance is not None:

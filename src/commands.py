@@ -133,9 +133,9 @@ def _status_ok(page: Page, command: CommandSpec) -> bool:
 
 def _opts_into_terminal_status(page: Page, command: CommandSpec) -> bool:
     """Whether `command` names the page's (terminal) status in an explicit `legal_in`, overriding the
-    terminal-state authoring lock - how bookkeeping that outlives the work stays writable.
+    terminal-status authoring lock - how bookkeeping that outlives the work stays writable.
 
-    Always explicit: `legal_in=None` (the default) says nothing about the terminal state and stays
+    Always explicit: `legal_in=None` (the default) says nothing about the terminal status and stays
     locked, as does a `legal_in` that omits it.
     """
     return command.legal_in is not None and page.status in command.legal_in
@@ -154,8 +154,8 @@ def legal_commands(page: Page, page_type: PageType, ignore_requirements: bool = 
 
     `ignore_requirements=True` skips *only* the required-content preconditions, so a transition
     gated on unfilled required content still reports legal on the FSM topology alone. Used by doc
-    generation to enumerate a state's outgoing transitions on a content-less page; FSM topology, the
-    `legal_in` status-lock, and the terminal-state authoring lock are unaffected. Not exposed through
+    generation to enumerate a status's outgoing transitions on a content-less page; FSM topology, the
+    `legal_in` status-lock, and the terminal-status authoring lock are unaffected. Not exposed through
     the live describeMutations tool.
     """
     allowed = fsm.allowed_events(page_type.fsm, page.status)
@@ -165,8 +165,8 @@ def legal_commands(page: Page, page_type: PageType, ignore_requirements: bool = 
             _topology_ok(command, allowed)
             and _status_ok(page, command)
             and (ignore_requirements or not unmet_requirements(page, command))
-            # Terminal state: lock authoring, leave transitions (e.g. reopen) legal, and let a
-            # command naming this state in `legal_in` opt back in.
+            # Terminal status: lock authoring, leave transitions (e.g. reopen) legal, and let a
+            # command naming this status in `legal_in` opt back in.
             and (not in_terminal or _is_status_transition(command)
                  or _opts_into_terminal_status(page, command))
         )
@@ -197,7 +197,7 @@ def field_setter_edges(page: Page, page_type: PageType,
     stage: its (section, field) is a required precondition (`requires`) of a transition TOPOLOGICALLY
     legal from the current status, AND the setter is legal right now. Derived generically from the
     FSM - no per-page-type knowledge - so a status-scoped setter surfaces only where its field is a
-    stage requirement, and the `legal_in=None` 'always legal' setters no longer add noise in states
+    stage requirement, and the `legal_in=None` 'always legal' setters no longer add noise in statuses
     where their field is not the goal (e.g. setSummary while building).
 
     `blocked_events` names events the CALLER has determined cannot fire for a reason that no
@@ -245,12 +245,12 @@ def field_setter_edges(page: Page, page_type: PageType,
 def transition_guidance(
     page_type: PageType, batch: list[dict[str, Any]], status: str
 ) -> str | None:
-    """The stage guidance for the state a committed `batch` left the page in (pure).
+    """The stage guidance for the status a committed `batch` left the page in (pure).
 
     The coarser sibling of `field_setter_edges`: that says which field to author next, this says
     what the stage just entered is for. None unless the batch moved the status - which it did
     exactly when it held a page-status transition, so the store never has to report it. `status`
-    is the status after the batch, so several transitions yield only the final state's text.
+    is the status after the batch, so several transitions yield only the final status's text.
     """
     for entry in batch:
         command = get_pagetype_command(page_type, entry.get("command") or "")

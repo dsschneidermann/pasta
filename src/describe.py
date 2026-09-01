@@ -79,7 +79,7 @@ def _command_summary(command: CommandSpec) -> dict[str, Any]:
         "event": command.event,
         "agency": command.agency,
         # statuses a CONTENT command is allowed in. Suppressed for a transition/compound command:
-        # there `legal_in` is the edge's SOURCE state, already reported in the FSM transition list,
+        # there `legal_in` is the edge's SOURCE status, already reported in the FSM transition list,
         # so hiding it here keeps the describe output unclobbered.
         "legalIn": (list(command.legal_in) if command.legal_in
                     and command.kind not in (TRANSITION, COMPOUND) else None),

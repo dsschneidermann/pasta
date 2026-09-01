@@ -107,8 +107,8 @@ def _status_transitions(page_type: PageType) -> tuple[tuple[str, str, str, str],
     """The page's status-FSM transition table, DERIVED from its transition/compound commands.
 
     Each top-level command with a page-status event (kind TRANSITION or COMPOUND, `event` set) owns one
-    edge: `legal_in` is its source state(s) and `dest` its destination. A command legal in several
-    states expands to one `(event, source, dest, agency)` per source.
+    edge: `legal_in` is its source status(es) and `dest` its destination. A command legal in several
+    statuses expands to one `(event, source, dest, agency)` per source.
     Nested COMPOUND sub-steps are NOT walked - the outer command carries the edge - so the inner
     transition step does not double-count. Iteration follows command-declaration order.
     """
