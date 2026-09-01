@@ -6,7 +6,7 @@ Pasta is an MCP server. Your project's features, bug reports, decision records a
 
 So a process you write down once (TDD, reproduce-before-you-fix, spec-then-plan) stops being something the agent read 40,000 tokens ago and starts being something it is handed at the moment it applies.
 
-> *On the name: pages are driven by an **FSM**, and an FSM is of course the Flying Spaghetti Monster. Hence pasta.*
+> *Pages are driven by an **FSM**, and an FSM is of course the Flying Spaghetti Monster. Hence pasta.*
 
 <img src="docs/pasta-ui-bug-example.png" width="550" alt="A bug report page in the pasta web UI">
 
