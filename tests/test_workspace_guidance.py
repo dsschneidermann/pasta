@@ -252,11 +252,11 @@ def test_set_workspace_guidance_tool_and_response_keys(mcp):
                   {"workspaceId": wid, "field": "buildTool", "text": "use pytest"})
     assert result == {"workspaceId": wid, "field": "buildTool",
                       "guidanceConfig": {"buildTool": "use pytest"}}
-    # A subsequent write response carries guidance_buildTool (page is at `building`), top level.
+    # A subsequent write response carries guidance_buildTool (page is at `building`), inside `next`.
     written = _mutate_server(mcp, {"workspaceId": wid, "pageId": pid,
                                    "commands": [{"command": "setSummary", "args": {"text": "S2"}}]})
-    assert written["guidance_buildTool"] == "use pytest"
-    # nextActions carries it too.
+    assert written["next"]["guidance_buildTool"] == "use pytest"
+    # `next` is the payload nextActions returns for the page, so the two agree by construction.
     actions = call(mcp, "nextActions", {"workspaceId": wid, "pageId": pid})
     assert actions["guidance_buildTool"] == "use pytest"
 
@@ -266,22 +266,10 @@ def test_create_page_response_carries_workspace_guidance(mcp):
     call(mcp, "setWorkspaceGuidance", {"workspaceId": wid, "field": "draftHint", "text": "drafting"})
     created = call(mcp, "createPage", {"workspaceId": wid, "type": "test-lifecycle", "title": "F"})
     assert created["status"] == "draft"
-    assert created["guidance_draftHint"] == "drafting"           # draft is in draftHint's set
+    assert created["next"]["guidance_draftHint"] == "drafting"   # draft is in draftHint's set
 
 
 def test_set_workspace_guidance_unknown_field_is_tool_error(mcp):
     wid = call(mcp, "createWorkspace", {"name": "demo"})["id"]
     with pytest.raises(ToolError, match="not a workspace guidance field"):
         call(mcp, "setWorkspaceGuidance", {"workspaceId": wid, "field": "nope", "text": "x"})
-
-
-# --- no regression for guidance-free types -----------------------------------
-def test_guidance_free_type_has_no_guidance_keys(mcp):
-    wid = call(mcp, "createWorkspace", {"name": "demo"})["id"]
-    created = call(mcp, "createPage", {"workspaceId": wid, "type": "test-fields", "title": "A"})
-    assert not any(key.startswith("guidance") for key in created)
-    written = _mutate_server(mcp, {"workspaceId": wid, "pageId": created["id"],
-                                   "commands": [{"command": "setBody", "args": {"text": "x"}}]})
-    assert not any(key.startswith("guidance") for key in written)
-    actions = call(mcp, "nextActions", {"workspaceId": wid, "pageId": created["id"]})
-    assert not any(key.startswith("guidance") for key in actions)

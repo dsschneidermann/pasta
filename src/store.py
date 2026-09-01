@@ -886,15 +886,6 @@ class Store:
             self._touch_and_save(workspace)
             return workspace
 
-    def page_workspace_guidance(self, workspace_id: str, page: Page) -> dict[str, str]:
-        """The configured guidance keys for `page` at its current status. Empty when the page's type
-        is unknown or declares nothing for this status."""
-        page_type = get_page_type(page.type)
-        if page_type is None:
-            return {}
-        workspace = self.load_workspace(workspace_id)
-        return workspace_guidance(page_type, page.status, workspace.guidance_config)
-
     # --- helpers -------------------------------------------------------------
     def _create_auto_children(
         self, workspace: Workspace, parent: Page, parent_type: PageType

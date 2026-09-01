@@ -10,11 +10,10 @@ from src.commands import (
     is_field_setter,
     legal_commands,
     resolve_anchored_slot,
-    transition_guidance,
 )
 from src.errors import ConflictError, IllegalCommandError, NotFoundError, ValidationError
 from src.model import Page
-from src.pagetypes.core.specs import FSMSpec, status_guidance
+from src.pagetypes.core.specs import FSMSpec
 from src.pagetypes.core.args import ElementBlocksSpec, _table_block, _text, standard_blocks
 from src.pagetypes.core.commands import add_link_cmd, set_title_cmd, blocks_cmds, list_cmds, set_prose_cmd, transition_cmd
 from src.pagetypes.core.fields import SectionSpec, _blocks, _list, _prose
@@ -755,23 +754,6 @@ def test_field_setter_edges_drop_blocked_events():
     assert field_setter_edges(child, CHILD, {"markReady"}) == []
     # An unrelated blocked event leaves the topology (and so the edges) untouched.
     assert "addStep" in {e["command"] for e in field_setter_edges(child, CHILD, {"reopen"})}
-
-
-# --- transition_guidance -----------------------------------------------------
-def test_transition_guidance_returns_the_entered_states_text():
-    guidance = transition_guidance(FLOW, [{"command": "open"}], "open")
-    assert guidance == status_guidance(FLOW.fsm, "open")
-    assert guidance                                  # non-empty: the fixture declares text here
-
-
-def test_transition_guidance_is_none_for_a_content_only_batch():
-    # No transition, so no new stage was entered.
-    assert transition_guidance(FLOW, [{"command": "setSummary", "args": {"text": "x"}}], "draft") is None
-
-
-def test_transition_guidance_is_none_when_the_state_declares_none():
-    # A real transition, but `draft` declares no guidance.
-    assert transition_guidance(FLOW, [{"command": "reopen"}], "draft") is None
 
 
 # --- block-bearing element fields --------------------------------------------

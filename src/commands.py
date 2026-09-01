@@ -32,7 +32,6 @@ from .pagetypes.core.specs import (
     SET_SCALAR,
     SET_TITLE,
     TRANSITION,
-    status_guidance,
 )
 from .pagetypes.core.args import ArgSpec, BlockKindSpec
 from .pagetypes.core.commands import CommandSpec, is_field_setter
@@ -240,23 +239,6 @@ def field_setter_edges(page: Page, page_type: PageType,
             setters.setdefault(target, command.name)
     return [_field_setter_edge(page, page_type, section, field, command_name)
             for (section, field), command_name in setters.items()]
-
-
-def transition_guidance(
-    page_type: PageType, batch: list[dict[str, Any]], status: str
-) -> str | None:
-    """The stage guidance for the status a committed `batch` left the page in (pure).
-
-    The coarser sibling of `field_setter_edges`: that says which field to author next, this says
-    what the stage just entered is for. None unless the batch moved the status - which it did
-    exactly when it held a page-status transition, so the store never has to report it. `status`
-    is the status after the batch, so several transitions yield only the final status's text.
-    """
-    for entry in batch:
-        command = get_pagetype_command(page_type, entry.get("command") or "")
-        if command is not None and _is_status_transition(command):
-            return status_guidance(page_type.fsm, status)
-    return None
 
 
 def apply_command(
