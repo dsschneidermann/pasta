@@ -50,17 +50,6 @@ class BlockKindSpec:
     ref_check: RefCheck | None = None
 
 
-@dataclass(frozen=True)
-class ElementBlocksSpec:
-    """A LIST element field that holds an ordered array of blocks instead of a scalar value.
-
-    `block_kinds` is the closed vocabulary the field accepts - the same BlockKindSpec tuple a
-    page-level blocks field declares, which is what makes the two levels one mechanism.
-    """
-    field: str
-    block_kinds: tuple[BlockKindSpec, ...]
-
-
 # --- Arg helpers -------------------------------------------------------------
 # Tiny ArgSpec factories so a command's arg list reads as `(_text("file"), _integer("level"), ...)`
 # instead of spelling out `ArgSpec(..., type=...)` each time. `_text()` is the common single-value

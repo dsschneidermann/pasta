@@ -7,16 +7,17 @@ from typing import Any
 
 from ...errors import ValidationError
 
-from .pagetype import PageType, get_pagetype_field
-from .args import BlockKindSpec, ElementBlocksSpec
+from .pagetype import PageType, element_fsm_sites, get_pagetype_field
+from .args import BlockKindSpec
 from .commands import CommandSpec, is_field_setter
-from .fields import FieldSpec, get_element_blocks
+from .fields import ElementBlocksSpec, FieldSpec, get_element_blocks
 from .specs import (
     ADD_ELEMENT,
     BLOCKS,
     LIST,
     SET_PROSE,
     SET_SCALAR,
+    ElementFSMSpec,
     FSMSpec,
     BLOCK_ARRAY,
     INLINE_RUNS,
@@ -329,6 +330,7 @@ def validate_page_type(page_type: PageType) -> list[str]:
         for field in section.fields:
             errors.extend(validate_field_spec(field))
     errors.extend(validate_fsm_spec(page_type.fsm))
+    errors.extend(validate_page_machine(page_type))
     errors.extend(validate_pagetype_field_setters(page_type))
     errors.extend(validate_pagetype_setter_descriptions(page_type))
     errors.extend(validate_pagetype_block_args(page_type))
@@ -339,6 +341,7 @@ def validate_workspace_guidance(registry: Mapping[str, PageType]) -> list[str]:
     """Validate the workspace-guidance declarations across the registry, collecting the errors."""
     errors: list[str] = []
     descriptions: dict[str, tuple[str, str]] = {}   # field -> (description, first tag to declare it)
+    labels: dict[str, tuple[str, str]] = {}         # field -> (label, first tag to declare it)
     for tag, page_type in registry.items():
         statuses = set(page_type.fsm.states)
         for spec in page_type.workspace_guidance:
@@ -353,12 +356,20 @@ def validate_workspace_guidance(registry: Mapping[str, PageType]) -> list[str]:
                         f"{tag}: workspace guidance '{spec.field}' names unknown status '{status}'.")
             if not spec.description:
                 errors.append(f"{tag}: workspace guidance '{spec.field}' has an empty description.")
+            if not spec.label:
+                errors.append(f"{tag}: workspace guidance '{spec.field}' has an empty label.")
             prior = descriptions.get(spec.field)
             if prior is None:
                 descriptions[spec.field] = (spec.description, tag)
             elif prior[0] != spec.description:
                 errors.append(
                     f"{tag}: workspace guidance '{spec.field}' description disagrees with '{prior[1]}'.")
+            prior_label = labels.get(spec.field)
+            if prior_label is None:
+                labels[spec.field] = (spec.label, tag)
+            elif prior_label[0] != spec.label:
+                errors.append(
+                    f"{tag}: workspace guidance '{spec.field}' label disagrees with '{prior_label[1]}'.")
     return errors
 
 
@@ -378,8 +389,43 @@ def validate_page_types(registry: Mapping[str, PageType]) -> None:
             "Invalid page-type declarations:\n" + "\n".join(f"- {error}" for error in errors))
 
 
+def validate_page_machine(page_type: PageType) -> list[str]:
+    """Every status and element machine this type declares actually built.
+
+    python-statemachine checks connectivity, unreachable states and trap states when it creates the
+    class, so the builds the page type already performed are the check and nothing is re-derived
+    here. Each message is rewritten into the names the spec declares, since the library reports a
+    state by the attribute the class carries it under. An element spec no page type declares is
+    unreachable and never built, so there is no ownerless failure to report.
+    """
+    errors: list[str] = []
+    if page_type.fsm.machine_error is not None:
+        errors.append("the status machine could not be built: "
+                      + _in_declared_names(page_type.fsm, str(page_type.fsm.machine_error)))
+    for section, field_key, element_fsm in element_fsm_sites(page_type):
+        if element_fsm.machine_error is not None:
+            errors.append(
+                f"element spec {element_fsm.name!r} on {section}.{field_key} could not be built: "
+                + _in_declared_names(element_fsm, str(element_fsm.machine_error)))
+    return errors
+
+
+def _in_declared_names(spec: FSMSpec | ElementFSMSpec, message: str) -> str:
+    """`message` with each state attribute name replaced by the state as the author declared it.
+
+    Longest state first, so one state whose name starts another cannot be substituted inside it.
+    """
+    for state in sorted(spec.states, key=len, reverse=True):
+        message = message.replace(f"state_{state}", state)
+    return message
+
+
 def validate_fsm_spec(fsm: FSMSpec) -> list[str]:
-    """Every status_guidance pair names a declared status, and no status twice."""
+    """Every status_guidance pair names a declared status, and no status twice.
+
+    Not folded into the machine build: python-statemachine has no notion of guidance, and accepts
+    a spec whose guidance names a status the type never declared.
+    """
     errors: list[str] = []
     seen: set[str] = set()
     for status, _text in fsm.status_guidance:

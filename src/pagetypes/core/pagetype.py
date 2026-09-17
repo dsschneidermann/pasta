@@ -1,9 +1,11 @@
 """The page type itself: what a page of this type is made of, and how it is set up.
 
-Its post-init hook does the two setup steps a declaration needs before anything reads it -
-resolves each block argument's vocabulary from the field it targets, and derives the
-FSM transition table from the commands. Whether the finished declaration is well-formed is
-a separate concern, checked by the validators in `validation.py`.
+Its post-init hook does the setup steps a declaration needs before anything reads it - resolves
+each block argument's vocabulary from the field it targets, derives the FSM transition table from
+the commands, and builds the machines those describe - the status machine, and every element
+machine the type declares on its list fields. Whether the finished declaration is well-formed is
+a separate concern, checked by the validators in `validation.py` - including what the build
+settles, which is reported there rather than raised from here.
 """
 
 from __future__ import annotations
@@ -12,6 +14,7 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 from ...errors import ValidationError
+from ...fsm import try_build_machine
 from .args import ArgSpec
 from .commands import CommandSpec
 from .fields import FieldSpec, SectionSpec, get_element_blocks
@@ -24,6 +27,7 @@ from .specs import (
     PROSE,
     TRANSITION,
     AutoChildSpec,
+    ElementFSMSpec,
     FSMSpec,
     WorkspaceGuidanceSpec,
 )
@@ -45,6 +49,20 @@ class PageType:
     def __post_init__(self):
         self._resolve_block_vocabularies()
         object.__setattr__(self.fsm, "transitions", _status_transitions(self))
+        self._build_machines()
+
+    def _build_machines(self) -> None:
+        """Build the status machine and every element machine this type declares.
+
+        The build is each spec's own well-formedness check, so it runs with the declaration
+        rather than on first use, and a failure is held rather than raised for the validator to
+        report. An element spec may be declared on more than one page type and carries one
+        machine either way, so a spec already built is left as it is.
+        """
+        _store_machine(self.fsm)
+        for _section, _field, element_fsm in element_fsm_sites(self):
+            if element_fsm.machine is None and element_fsm.machine_error is None:
+                _store_machine(element_fsm)
 
     def _resolve_block_vocabularies(self) -> None:
         """Fill each block-carrying argument's accepted kinds in from the field it targets.
@@ -87,6 +105,13 @@ class PageType:
         return replace(arg, block_kinds=element_blocks.block_kinds)
 
 
+def _store_machine(spec: FSMSpec | ElementFSMSpec) -> None:
+    """Build `spec`'s machine and keep whichever of the class or the error came back."""
+    machine, error = try_build_machine(spec)
+    object.__setattr__(spec, "machine", machine)
+    object.__setattr__(spec, "machine_error", error)
+
+
 def get_pagetype_command(self: PageType, name: str) -> CommandSpec | None:
     for command in self.commands:
         if command.name == name:
@@ -101,6 +126,19 @@ def get_pagetype_field(self: PageType, section_key: str, field_key: str) -> Fiel
                 if field_spec.key == field_key:
                     return field_spec
     return None
+
+
+def element_fsm_sites(page_type: PageType) -> tuple[tuple[str, str, ElementFSMSpec], ...]:
+    """Every element FSM this type declares, with the section and field it hangs off.
+
+    A list field is the only place an element FSM can be attached, so this walk is the whole
+    set: an element FSM no page type declares is unreachable, and nothing builds it.
+    """
+    return tuple(
+        (section.key, field_spec.key, field_spec.element_fsm)
+        for section in page_type.sections
+        for field_spec in section.fields
+        if field_spec.element_fsm is not None)
 
 
 def _status_transitions(page_type: PageType) -> tuple[tuple[str, str, str, str], ...]:

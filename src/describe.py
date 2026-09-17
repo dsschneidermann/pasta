@@ -37,8 +37,7 @@ def _block_schema(block_kinds: tuple[BlockKindSpec, ...]) -> dict[str, Any]:
 
 _REVISION_TOKEN_ARG = {
     "type": "string",
-    "description": "the page's current status_revision_token; a status transition regenerates it, so a "
-                   "batch holds at most one transition and only as its final command",
+    "description": "the current page token, allows only a transition at the end of a batch",
 }
 
 

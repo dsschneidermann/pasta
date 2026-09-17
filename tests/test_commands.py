@@ -14,9 +14,9 @@ from src.commands import (
 from src.errors import ConflictError, IllegalCommandError, NotFoundError, ValidationError
 from src.model import Page
 from src.pagetypes.core.specs import FSMSpec
-from src.pagetypes.core.args import ElementBlocksSpec, _table_block, _text, standard_blocks
+from src.pagetypes.core.args import _table_block, _text, standard_blocks
 from src.pagetypes.core.commands import add_link_cmd, set_title_cmd, blocks_cmds, list_cmds, set_prose_cmd, transition_cmd
-from src.pagetypes.core.fields import SectionSpec, _blocks, _list, _prose
+from src.pagetypes.core.fields import ElementBlocksSpec, SectionSpec, _blocks, _list, _prose
 from src.pagetypes.core.pagetype import PageType, initial_sections, get_pagetype_command, get_pagetype_field
 from src.pagetypes._registry import get_page_type
 

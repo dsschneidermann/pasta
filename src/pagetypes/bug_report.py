@@ -4,10 +4,15 @@ from __future__ import annotations
 
 from ._stage_guidance import BUG_REPORT_DRAFT, BUG_REPORT_OPEN, REVIEW
 from ._workspace_guidance import (
+    GROUNDING_TOOL_DESC,
+    GROUNDING_TOOL_FIELD,
+    GROUNDING_TOOL_LABEL,
     MERGE_PROCESS_DESC,
     MERGE_PROCESS_FIELD,
+    MERGE_PROCESS_LABEL,
     TESTING_TOOL_DESC,
     TESTING_TOOL_FIELD,
+    TESTING_TOOL_LABEL,
 )
 from .core.specs import FSMSpec, WorkspaceGuidanceSpec
 from .core.args import _text
@@ -88,8 +93,9 @@ _BUG_REPORT = PageType(
         )),
     ),
     workspace_guidance=(
-        WorkspaceGuidanceSpec(MERGE_PROCESS_FIELD, ("review", "done"), MERGE_PROCESS_DESC),
-        WorkspaceGuidanceSpec(TESTING_TOOL_FIELD, ("open",), TESTING_TOOL_DESC),
+        WorkspaceGuidanceSpec(MERGE_PROCESS_FIELD, ("done",), MERGE_PROCESS_DESC, MERGE_PROCESS_LABEL),
+        WorkspaceGuidanceSpec(TESTING_TOOL_FIELD, ("open",), TESTING_TOOL_DESC, TESTING_TOOL_LABEL),
+        WorkspaceGuidanceSpec(GROUNDING_TOOL_FIELD, ("open",), GROUNDING_TOOL_DESC, GROUNDING_TOOL_LABEL),
     ),
     commands=(
         set_scalar_cmd("report", "component"),
@@ -106,7 +112,8 @@ _BUG_REPORT = PageType(
         transition_cmd("submitForReview", "open -> review"),
         # review -> done marks the fix built and reviewed, but not yet shippable or merged to main.
         transition_cmd("markDone", "review -> done"),
-        transition_cmd("requestChanges", "review -> open", agency="either"),
+        transition_cmd("requestChanges", "review or done -> open",
+                       legal_in=("review", "done"), agency="either"),
         # close is a human gate: a person confirms the fix is shippable/merged before it lands.
         transition_on_add_cmd("close", "done -> closed", section="resolution", field="fixCommits",
                      description="record a fix commit AND close the bug", agency="human",

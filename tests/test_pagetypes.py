@@ -1,10 +1,11 @@
 """Unit tests for registry integrity - the specs must be internally consistent.
 
-The generic, parametrized structural invariants run over BOTH the production REGISTRY and the
+The generic, parametrized structural invariants run over BOTH the production types and the
 hand-authored test registry (TEST_REGISTRY) - every page type, production or fixture, must be
-well-formed. `test_expected_types_registered` stays pinned to the production SET so a genuinely
-new or removed production type still fails loudly. The content-specific assertions further down
-pin to the test fixtures (src.testtypes), so enriching a production type never breaks them.
+well-formed. The production side is named from the page-type modules rather than read out of
+REGISTRY, which test mode empties, and `test_production_types_are_exactly_the_registered_ones`
+keeps that hand-written list honest. The content-specific assertions further down pin to the test
+fixtures (src.testtypes), so enriching a production type never breaks them.
 """
 
 from textwrap import dedent
@@ -36,12 +37,14 @@ from src.pagetypes.core.specs import (
     BLOCK_ARRAY,
     LIST,
     PROSE,
+    ElementFSMSpec,
     FSMSpec,
     status_guidance,
 )
-from src.pagetypes.core.args import BlockKindSpec, ElementBlocksSpec, _array, _boolean, _code_block, _divider_block, _heading_runs, _heading_text, _integer, _list_block, _paragraph_runs, _paragraph_text, _quote_block, _table_block, _text, standard_blocks
-from src.pagetypes.core.commands import CommandSpec, blocks_cmds, element_blocks_cmds, list_cmds, set_prose_cmd
+from src.pagetypes.core.args import BlockKindSpec, _array, _boolean, _code_block, _divider_block, _heading_runs, _heading_text, _integer, _list_block, _paragraph_runs, _paragraph_text, _quote_block, _table_block, _text, standard_blocks
+from src.pagetypes.core.commands import CommandSpec, blocks_cmds, element_blocks_cmds, list_cmds, set_prose_cmd, transition_cmd
 from src.pagetypes.core.fields import (
+    ElementBlocksSpec,
     FieldSpec,
     SectionSpec,
     _blocks,
@@ -51,6 +54,7 @@ from src.pagetypes.core.fields import (
     get_element_blocks,
 )
 from src.pagetypes.core.pagetype import (
+    element_fsm_sites,
     PageType,
     initial_sections,
     get_pagetype_command,
@@ -70,8 +74,21 @@ from src.pagetypes.core.validation import (
     validate_pagetype_block_args,
     validate_pagetype_setter_descriptions,
 )
-from src.pagetypes._registry import REGISTRY, get_page_type
+from src.pagetypes._registry import get_page_type
 from src.pagetypes import _stage_guidance
+from src.pagetypes.architecture import _ARCHITECTURE
+from src.pagetypes.bug_report import _BUG_REPORT
+from src.pagetypes.decision_record import _DECISION_RECORD
+from src.pagetypes.document import _DOCUMENT
+from src.pagetypes.epic import _AGENT_PLAN, _EPIC
+from src.pagetypes.feature import (
+    _FEATURE_BRIEF,
+    _FEATURE_SPEC,
+    _IMPLEMENTATION_PLAN,
+    _TESTING_PLAN,
+)
+from src.pagetypes.simple_change import _SIMPLE_CHANGE
+from src.pagetypes.toc import _TOC
 from src.testtypes import TEST_REGISTRY
 
 _STANDARD_BLOCK_HELPERS = {
@@ -85,8 +102,15 @@ def _kinds(*names: str) -> tuple[BlockKindSpec, ...]:
     return tuple(_STANDARD_BLOCK_HELPERS[name]() for name in names)
 
 
+# The production types named from their own modules rather than read out of REGISTRY: entering test
+# mode empties that map, and these invariants must keep covering production all the same.
+PRODUCTION_TYPES = {page_type.tag: page_type for page_type in (
+    _ARCHITECTURE, _DECISION_RECORD, _BUG_REPORT, _SIMPLE_CHANGE, _FEATURE_BRIEF, _FEATURE_SPEC,
+    _IMPLEMENTATION_PLAN, _TESTING_PLAN, _EPIC, _AGENT_PLAN, _DOCUMENT, _TOC,
+)}
+
 # Structural invariants must hold for EVERY page type - production and hand-authored fixture alike.
-ALL_TYPES = {**REGISTRY, **TEST_REGISTRY}
+ALL_TYPES = {**PRODUCTION_TYPES, **TEST_REGISTRY}
 
 # Commands that target a real section.field
 CONTENT_TARGETING = {
@@ -368,7 +392,7 @@ def test_blocks_fixture_has_full_block_surface():
 def test_add_link_on_every_authorable_type_but_not_toc():
     # add_link_cmd() is added to every authorable production page type; the command-less toc is the
     # sole exception - it has no authoring surface at all, so it must NOT carry addLink.
-    for tag, page_type in REGISTRY.items():
+    for tag, page_type in PRODUCTION_TYPES.items():
         command = get_pagetype_command(page_type, "addLink")
         if tag == "toc":
             assert command is None, "toc cannot be authored - it must not carry addLink"
@@ -381,7 +405,7 @@ def test_add_link_on_every_authorable_type_but_not_toc():
 def test_set_title_on_every_authorable_type_but_not_toc():
     # set_title_cmd() - the universal rename alias - is added to every authorable production page type
     # alongside addLink; the command-less toc is the sole exception with no authoring surface.
-    for tag, page_type in REGISTRY.items():
+    for tag, page_type in PRODUCTION_TYPES.items():
         command = get_pagetype_command(page_type, "setTitle")
         if tag == "toc":
             assert command is None, "toc cannot be authored - it must not carry setTitle"
@@ -525,7 +549,7 @@ def test_every_production_guidance_text_comes_from_the_stage_guidance_module():
                  for name, value in vars(_stage_guidance).items()
                  if name.isupper() and isinstance(value, str)}
     declared = [(tag, state, text)
-                for tag, page_type in REGISTRY.items()
+                for tag, page_type in PRODUCTION_TYPES.items()
                 for state, text in page_type.fsm.status_guidance]
     assert declared, "no production page type declares stage guidance"
     for tag, state, text in declared:
@@ -602,8 +626,8 @@ def test_field_spec_rejects_a_bad_block_vocabulary():
 
 # --- Block-bearing element fields --------------------------------------------
 def test_element_blocks_spec_is_hashable():
-    # FieldSpec is reachable from the FSMSpec that keys fsm._machine_class's lru_cache, so a
-    # declaration that cannot be hashed would break every page type at once.
+    # The spec dataclasses are frozen and compared by value, so a declaration that cannot be
+    # hashed would break the specs that reach it.
     assert {ElementBlocksSpec("detail", (_code_block(),))} == {ElementBlocksSpec("detail", (_code_block(),))}
     field = FieldSpec(key="items", kind=LIST, element_fields=("text", "detail"),
                       element_blocks=(ElementBlocksSpec("detail", (_code_block(),)),))
@@ -853,11 +877,11 @@ def test_the_block_surface_is_three_commands_per_field():
     no in-place edit at all: a block is replaced by removing it and adding at its slot.
     """
     adds = [command.name
-            for page_type in REGISTRY.values()
+            for page_type in PRODUCTION_TYPES.values()
             for command in page_type.commands
             if command.kind == ADD_BLOCK]
     assert len(adds) == 8
-    document = {command.name for command in REGISTRY["document"].commands}
+    document = {command.name for command in PRODUCTION_TYPES["document"].commands}
     assert document == {"addBody", "removeBlock", "reorderBlock", "addLink", "setTitle"}
 
 
@@ -865,7 +889,7 @@ def test_block_command_names_match_the_declared_surface():
     """Every production add name, and the remove/reorder names it sits beside - which are
     byte-identical to what they were before the sets were dropped."""
     names = {tag: {command.name for command in page_type.commands}
-             for tag, page_type in REGISTRY.items()}
+             for tag, page_type in PRODUCTION_TYPES.items()}
     assert {"addBody", "removeBlock", "reorderBlock"} <= names["document"]
     assert {"addDetails", "removeNote", "reorderNote"} <= names["architecture"]
     assert {"addDecision", "removeDecisionBlock", "reorderDecisionBlock",
@@ -877,7 +901,7 @@ def test_block_command_names_match_the_declared_surface():
             "addStepDetail", "removeStepDetail",
             "reorderStepDetail"} <= names["implementation-plan"]
     # Names stay unique within a type.
-    for tag, page_type in REGISTRY.items():
+    for tag, page_type in PRODUCTION_TYPES.items():
         declared = [command.name for command in page_type.commands]
         assert len(declared) == len(set(declared)), f"{tag} declares a duplicate command name"
 
@@ -896,7 +920,7 @@ def test_two_do_eligible_setters_for_one_field_are_rejected():
                for error in validate_pagetype_field_setters(two_setters))
     # Every registered type passes it - the five collapsing blocks fields were the only ones
     # that ever carried more than one.
-    for page_type in {**REGISTRY, **TEST_REGISTRY}.values():
+    for page_type in ALL_TYPES.values():
         assert validate_pagetype_field_setters(page_type) == []
 
 
@@ -1003,6 +1027,18 @@ def test_an_unresolvable_block_argument_is_left_unfilled_rather_than_raising():
     assert resolved is not None and resolved.args[0].block_kinds is None
 
 
+def test_element_fsm_sites_names_every_declaring_field():
+    # test-child declares two element FSMs, on steps.items and checks.items, in that order.
+    child = get_page_type("test-child")
+    assert [(section, field) for section, field, _fsm in element_fsm_sites(child)] == [
+        ("steps", "items"), ("checks", "items")]
+
+
+def test_element_fsm_sites_is_empty_for_a_type_with_no_element_fsm():
+    # test-blocks has no list field at all, so there is nothing to walk.
+    assert element_fsm_sites(get_page_type("test-blocks")) == ()
+
+
 def test_validate_page_type_is_clean_for_every_registered_type():
     # The extraction must not have made any real type invalid.
     for page_type in ALL_TYPES.values():
@@ -1027,7 +1063,72 @@ def test_validate_page_types_aggregates_every_defect_into_one_raise():
     assert "xtest-broken:" in message
 
 
-def test_validate_registry_passes_over_the_production_registry():
-    # The single entry point the primary flows call returns cleanly for the real registry.
+def test_validate_page_types_reports_a_status_machine_that_cannot_be_built():
+    # `orphan` is unreachable, so the machine cannot be built. The declaration imports cleanly and
+    # the failure arrives through validation, named the way its author wrote it.
+    unreachable = PageType(
+        tag="xtest-unreachable", name="Unreachable", description="ad-hoc",
+        sections=(SectionSpec("body", "Body", (_prose("body"),)),),
+        commands=(transition_cmd("finish", "draft → done"),),
+        fsm=FSMSpec(name="XUnreachable", initial="draft", states=("draft", "done", "orphan")),
+    )
+    with pytest.raises(ValueError) as exc:
+        validate_page_types({unreachable.tag: unreachable})
+    message = str(exc.value)
+    assert "xtest-unreachable:" in message
+    assert "'orphan'" in message
+    assert "state_orphan" not in message
+
+
+def test_validate_page_types_reports_an_element_machine_that_cannot_be_built():
+    # An element FSM with an unreachable state cannot build. The page reports it, naming the
+    # element spec and the field it is declared on, in the states its author wrote.
+    orphan = ElementFSMSpec(name="XOrphanItem", initial="todo",
+                            states=("todo", "done", "orphan"),
+                            transitions=(("markDone", "todo", "done", "agent"),))
+    carrier = PageType(
+        tag="xtest-element-orphan", name="ElementOrphan", description="ad-hoc",
+        sections=(SectionSpec("items", "Items", (
+            _list("items", element_fields=("text", "status"), element_fsm=orphan,
+                  description="items"),)),),
+        commands=(),
+        fsm=FSMSpec(name="XElementOrphan", initial="active", states=("active",)),
+    )
+    with pytest.raises(ValueError) as exc:
+        validate_page_types({carrier.tag: carrier})
+    message = str(exc.value)
+    assert "xtest-element-orphan:" in message
+    assert "'XOrphanItem'" in message
+    assert "items.items" in message
+    assert "'orphan'" in message
+    assert "state_orphan" not in message
+
+
+def test_validate_registry_passes_over_the_production_registry(production_mode):
+    # The single entry point the primary flows call returns cleanly for the real registry, which is
+    # in place only outside test mode.
     from src.pagetypes._registry import validate_registry
     assert validate_registry() is None
+
+
+def test_declaration_errors_answers_for_the_types_actually_being_served(invalid_declarations):
+    # The serving gates cannot use `validate_registry`: it raises, and it names REGISTRY, which is
+    # the half a failed reload leaves behind. `declaration_errors` asks the same question of the
+    # types in play and hands back the message instead of raising, so a gate can refuse a request.
+    from src.pagetypes._registry import declaration_errors
+    errors = declaration_errors()
+    assert errors is not None
+    assert invalid_declarations in errors
+
+
+def test_declaration_errors_is_none_for_the_production_registry(production_mode):
+    # No false quarantine: the real registry validates, so the gates stay out of the way.
+    from src.pagetypes._registry import declaration_errors
+    assert declaration_errors() is None
+
+
+def test_production_types_are_exactly_the_registered_ones(production_mode):
+    # PRODUCTION_TYPES is written out by hand so the invariants above survive test mode emptying
+    # REGISTRY; this is what fails when a page type is added or removed and the list is not.
+    from src.pagetypes._registry import registered_pagetypes
+    assert registered_pagetypes() == PRODUCTION_TYPES

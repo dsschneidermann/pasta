@@ -15,6 +15,7 @@ from fastmcp import Client
 from fastmcp.exceptions import ToolError
 
 import src.server as server
+from src.pagetypes._stage_guidance import PAGE_STATUS_GUIDANCE
 from src.store import Store
 
 
@@ -291,7 +292,7 @@ def test_mutate_page_batch_carries_guidance_inside_next_on_a_transition(mcp):
                   {"workspaceId": workspace_id, "pageId": page_id,
                    "commands": [{"command": "open"}]})
     assert result["status"] == "open"
-    assert result["next"]["guidance"] == FLOW_OPEN_GUIDANCE
+    assert result["next"]["guidance"] == PAGE_STATUS_GUIDANCE + FLOW_OPEN_GUIDANCE
 
 
 def test_mutate_page_batch_carries_guidance_on_a_content_only_write(mcp):
@@ -303,7 +304,7 @@ def test_mutate_page_batch_carries_guidance_on_a_content_only_write(mcp):
     result = _mutate(mcp,
                   {"workspaceId": workspace_id, "pageId": page_id,
                    "commands": [{"command": "setSummary", "args": {"text": "x"}}]})
-    assert result["next"]["guidance"] == FLOW_OPEN_GUIDANCE
+    assert result["next"]["guidance"] == PAGE_STATUS_GUIDANCE + FLOW_OPEN_GUIDANCE
 
 
 def test_two_transitions_in_one_batch_are_rejected(mcp):
@@ -326,7 +327,7 @@ def test_create_page_carries_initial_status_guidance_and_children_do_not(mcp):
     # A guided initial status rides `next`.
     child = call(mcp, "createPage",
                  {"workspaceId": workspace_id, "type": "test-child", "title": "Child"})
-    assert child["next"]["guidance"] == "draft - write the steps and checks here."
+    assert child["next"]["guidance"] == PAGE_STATUS_GUIDANCE + "draft - write the steps and checks here."
 
     # An auto-pinned child gets no echo, even though it guides its initial status: `next` guides
     # only the focused page, and the pinned child is not it.
@@ -354,3 +355,46 @@ def test_status_revision_surfaced_and_echoed_via_server(mcp):
         call(mcp, "mutatePageBatch", {"workspaceId": wid, "pageId": created["id"],
                                       "commands": [{"command": "close",
                                                     "args": {"statusRevisionToken": "nope", "sha": "a", "message": "m"}}]})
+
+
+# --- Declaration quarantine --------------------------------------------------
+# The gate is asked per call rather than at load, so that it holds even when this module is the
+# stale half of a reload. These drive it through the real tool path.
+
+def test_tool_calls_are_refused_while_a_page_type_declaration_is_invalid(mcp, invalid_declarations):
+    # A describe answered from an invalid declaration contradicts itself, listing the fields that
+    # survived while the command list still advertises a setter for the deleted one.
+    with pytest.raises(ToolError, match="page-type declarations"):
+        call(mcp, "describePageType", {"type": "xtest-orphan-setter"})
+
+
+def test_a_write_cannot_reach_disk_while_a_page_type_declaration_is_invalid(mcp, invalid_declarations):
+    # An orphaned setter's write is durable and readable back, yet never rendered, since the
+    # renderer iterates the spec. Refusing the call is what stops it, so writes are gated too.
+    with pytest.raises(ToolError, match="page-type declarations"):
+        call(mcp, "createWorkspace", {"name": "demo"})
+
+
+def test_the_refusal_names_the_declaration_error(mcp, invalid_declarations):
+    # The caller here is an agent, which never sees the dev console, so the refusal has to carry
+    # the reason itself.
+    with pytest.raises(ToolError, match="setPlatform"):
+        call(mcp, "listWorkspaces")
+
+
+def test_the_refusal_points_at_the_running_servers_reload_log(mcp, invalid_declarations):
+    # The message names the errors but carries no traceback, so it has to say where one is. The
+    # caller is usually in a different checkout than the server, hence absolute and server-resolved.
+    from src._hmr_debug import LOG_PATH
+    with pytest.raises(ToolError, match="hmr_debug.log"):
+        call(mcp, "listWorkspaces")
+    try:
+        call(mcp, "listWorkspaces")
+    except ToolError as exc:
+        assert str(LOG_PATH) in str(exc)
+        assert LOG_PATH.is_absolute()
+
+
+def test_tool_calls_run_normally_once_the_declarations_validate(mcp):
+    # No lingering quarantine: the gate is a live question, so a valid registry answers as usual.
+    assert call(mcp, "listWorkspaces") == []

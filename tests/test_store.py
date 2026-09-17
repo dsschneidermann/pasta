@@ -442,6 +442,33 @@ def test_search_ranks_and_resolves_partial_id(store):
     assert archived[0]["archived"] is True
 
 
+def test_search_matches_a_term_wrapped_in_emphasis_or_quotes(store):
+    # A wrapped term is the same word to a reader, so search has to reach it. Stripping the
+    # query too keeps the two sides symmetric, so either may carry the wrapper and still meet.
+    workspace = store.create_workspace("demo")
+    page = store.create_page(
+        workspace.id, "test-fields", "Move `ElementBlocksSpec` from `args.py` to `fields.py`").page
+    _mutate(store, workspace.id, page.id, [
+        {"command": "setBody", "args": {"text": "declare *groundingTool*, _mergeProcess_, "
+                                                "'testingTool' and \"statusRevisionToken\" here"}}])
+
+    def ids(query):
+        return [hit["pageId"] for hit in store.search(workspace.id, query)["hits"]]
+
+    # the reported case: a backticked identifier carried only by the title
+    assert ids("ElementBlocksSpec") == [page.id]
+    assert ids("elementblocksspec") == [page.id]          # still case-insensitive
+    assert ids("args") == [page.id]                       # `args.py` keeps its internal dot
+    # every other wrapper an author reaches for
+    assert ids("groundingTool") == [page.id]              # *emphasis*
+    assert ids("mergeProcess") == [page.id]               # _emphasis_
+    assert ids("testingTool") == [page.id]                # 'single quotes'
+    assert ids("statusRevisionToken") == [page.id]        # "double quotes"
+    # and a query that carries the wrapper reaches the bare word just the same
+    assert ids("`ElementBlocksSpec`") == [page.id]
+    assert ids('"groundingTool"') == [page.id]
+
+
 def test_text_search_excludes_descendants_of_an_archived_page(store):
     # Archiving cascades onto PINNED children only, so an ordinary descendant keeps archived=False.
     # The tree hides it anyway (it recurses and stops at the archived ancestor), so text search has
@@ -1712,6 +1739,34 @@ def test_a_command_after_a_transition_in_one_batch_is_rejected(revstore):
             {"command": "setSummary", "args": {"statusRevisionToken": token, "text": "s"}},     # stale now
         ])
     assert revstore.get_page(workspace.id, page.id).status == "draft"       # all-or-nothing
+
+
+def test_rejection_after_a_transition_names_the_revision_the_rollback_leaves(revstore):
+    """The token a mid-batch transition generates is discarded with the abort and the caller never
+    sees it, so the error reports the revision the page is left holding - the one to retry with."""
+    workspace = revstore.create_workspace("demo")
+    page = revstore.create_page(workspace.id, "test-flow", "C").page        # token "000001"
+    token = page.status_revision_token
+    with pytest.raises(ConflictError) as exc:
+        revstore.mutate_page_batch(workspace.id, page.id, [
+            {"command": "open", "args": {"statusRevisionToken": token}},                       # -> "000002"
+            {"command": "setSummary", "args": {"statusRevisionToken": token, "text": "s"}},     # stale now
+        ])
+    message = str(exc.value)
+    kept = revstore.get_page(workspace.id, page.id).status_revision_token
+    assert kept == token                                        # the rollback restores nothing else
+    assert repr(kept) in message                                # what survives is named
+    assert "000002" not in message                              # the discarded token is not
+
+
+def test_rejection_before_any_transition_names_the_current_revision(revstore):
+    workspace = revstore.create_workspace("demo")
+    page = revstore.create_page(workspace.id, "test-flow", "C").page        # token "000001"
+    with pytest.raises(ConflictError) as exc:
+        revstore.mutate_page_batch(workspace.id, page.id, [
+            {"command": "setSummary", "args": {"statusRevisionToken": "wrong", "text": "s"}}])
+    # No transition ran, so the working copy never moved: the page's own token is the one to name.
+    assert repr(page.status_revision_token) in str(exc.value)
 
 
 def test_set_page_status_regenerates_the_revision(revstore):

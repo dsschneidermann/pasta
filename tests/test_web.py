@@ -177,3 +177,40 @@ def test_page_view_renders_the_structured_body(client):
     assert '<nav class="page-contents"' in response.text
     assert "The body." in response.text                 # the prose field still reaches the page
     assert 'id="sidebar"' in response.text              # the Markdown-rendered nav is untouched
+
+
+# --- Declaration quarantine --------------------------------------------------
+# The renderer iterates the spec, so an invalid declaration still renders a plausible page - one
+# quietly missing the deleted field, on a tab the reloader has just called current. These pin the
+# refusal that replaces it.
+
+def test_a_page_is_refused_while_a_page_type_declaration_is_invalid(client, invalid_declarations):
+    workspace = server.STORE.create_workspace("demo")
+    response = client.get(f"/{workspace.id}")
+    assert response.status_code == 503
+    # The reason, not just a failure code. Asserted on the quoted names rather than the whole
+    # message because the template escapes the quotes around them.
+    assert "setPlatform" in response.text
+    assert "report.platform" in response.text
+
+
+def test_the_refusal_keeps_the_live_reload_socket_so_the_fix_lands_on_its_own(client, invalid_declarations):
+    # The quarantine page is served through the ordinary error template, which carries the reloader
+    # script. That is the whole recovery path: fix the file, the reload fires a refresh, and the
+    # browser leaves the 503 by itself. A bare PlainTextResponse would strand it.
+    response = client.get("/")
+    assert response.status_code == 503
+    assert "/ws/reloader" in response.text
+
+
+def test_the_refusal_is_not_cached(client, invalid_declarations):
+    # A cached 503 would outlive the fix and make the surface look permanently down.
+    response = client.get("/")
+    assert response.status_code == 503
+    assert "no-store" in response.headers["cache-control"]
+
+
+def test_pages_serve_normally_once_the_declarations_validate(client):
+    # No lingering quarantine on the HTTP side either.
+    server.STORE.create_workspace("demo")
+    assert client.get("/").status_code == 200

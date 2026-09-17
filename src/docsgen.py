@@ -24,14 +24,14 @@ points make the FSM walk trivial:
 from __future__ import annotations
 
 from collections import deque
+from types import ModuleType
 from typing import Any
 
 from .describe import describe_mutations, describe_page_type
 from .model import Page
 from .pagetypes.core.specs import COMPOUND, TRANSITION, FSMSpec
 from .pagetypes.core.pagetype import PageType, initial_sections
-from .pagetypes._registry import discoverable_registry
-from .statecharts import page_machine_qualname
+from .pagetypes._registry import is_test_mode, registered_pagetypes
 
 # Kinds that fire the *page-status* FSM (element_transition fires an element's own FSM, so it is an
 # authoring command from the page's point of view, not a status transition).
@@ -74,6 +74,40 @@ def _seed_page(page_type: PageType, state: str) -> Page:
         status=state,
         sections=initial_sections(page_type),
     )
+
+
+# --- the machine a state page draws ------------------------------------------
+def _bindings_module() -> ModuleType:
+    """The module binding the machine classes for the page types being documented.
+
+    Imported here rather than at the top so the fixtures stay out of a live server's import
+    graph."""
+    if is_test_mode():
+        from . import testcharts
+
+        return testcharts
+    from . import statecharts
+
+    return statecharts
+
+
+def page_machine_qualname(tag: str) -> str:
+    """The importable dotted path of the page-status machine bound for page type `tag`.
+
+    The diagram directive imports the class by this path. A machine is built under its spec's own
+    name and bound under that name with a `Machine` suffix, so the path is derived from the page
+    type; checking that it really is bound is what keeps a type whose binding was never added from
+    going silently undocumented.
+    """
+    page_type = registered_pagetypes().get(tag)
+    if page_type is None:
+        raise KeyError(f"Unknown page type {tag!r}.")
+    module = _bindings_module()
+    name = f"{page_type.fsm.name}Machine"
+    if not hasattr(module, name):
+        raise KeyError(
+            f"No page-status machine is bound in {module.__name__} for page type {tag!r}.")
+    return f"{module.__name__}.{name}"
 
 
 # --- Markdown rendering ------------------------------------------------------
@@ -241,7 +275,7 @@ def state_docs(page_type: PageType) -> dict[str, str]:
 
 def all_state_docs(registry: dict[str, PageType] | None = None) -> dict[str, str]:
     """Every page-type-state doc across the registry, keyed ``<tag>-<state>``."""
-    registry = discoverable_registry() if registry is None else registry
+    registry = registered_pagetypes() if registry is None else registry
     docs: dict[str, str] = {}
     for page_type in registry.values():
         docs.update(state_docs(page_type))
@@ -250,7 +284,7 @@ def all_state_docs(registry: dict[str, PageType] | None = None) -> dict[str, str
 
 def render_states_index(registry: dict[str, PageType] | None = None) -> str:
     """The generated ``states.md`` - a toctree over every state doc, so they are reachable."""
-    registry = discoverable_registry() if registry is None else registry
+    registry = registered_pagetypes() if registry is None else registry
     lines = [
         "# Page-type states",
         "",

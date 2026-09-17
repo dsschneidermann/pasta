@@ -37,10 +37,12 @@ Tests assert against these fixtures so a production page type can be enriched fr
 churning the suite; production types are trusted to reuse these same patterns and are verified only
 through the generic invariants, the registered set, the description directive, and doc generation.
 
-These types are RESOLVABLE by ``get_page_type`` (so the store, renderer, and pure core operate on a
-test page like any other) but HIDDEN from discovery - the ``describePageType`` listing and doc-gen
-enumeration - unless the test-only ``expose_test_types()`` flag is set (see src.pagetypes). They
-are deliberately NOT bound in src.statecharts, so they are not documentable.
+Under test mode these types stand in for the production registry (see src.pagetypes._registry): they
+are what ``registered_pagetypes()`` hands back, so the store, renderer, and pure core operate on a
+test page like any other and the ``describePageType`` listing advertises them. Outside test mode they
+neither resolve nor list. Their status machines are bound in src.testcharts rather than beside the
+production ones, so doc generation runs over them too without the documentation site ever naming a
+fixture.
 
 Command DECLARATION flows through the SAME shared command-helper factories the production types use
 (``set_prose_cmd`` / ``set_scalar_cmd`` / ``list_cmds`` / ``element_cmds`` / ``set_element_field_cmd`` /
@@ -50,7 +52,7 @@ src.pagetypes) - so a fixture reads like a production type and doubles as covera
 helpers, while its command surface (names, args, legality, FSM edges, guards, ref-checks) stays
 exactly what it was when hand-written. The field-spec and command helpers are shared with
 src.pagetypes; only the element FSMs are declared locally, named distinctly so their diagram labels
-and cache identity never collide with production.
+and registered class names never collide with production.
 """
 
 from __future__ import annotations
@@ -64,7 +66,7 @@ from .pagetypes.core.specs import (
     RefCheck,
     WorkspaceGuidanceSpec,
 )
-from .pagetypes.core.args import BlockKindSpec, ElementBlocksSpec, _boolean, _code_block, _list_block, _paragraph_runs, _paragraph_text, _text, standard_blocks
+from .pagetypes.core.args import BlockKindSpec, _boolean, _code_block, _list_block, _paragraph_runs, _paragraph_text, _text, standard_blocks
 from .pagetypes.core.commands import (
     add_link_cmd,
     set_title_cmd,
@@ -79,6 +81,7 @@ from .pagetypes.core.commands import (
     transition_on_add_cmd,
 )
 from .pagetypes.core.fields import (
+    ElementBlocksSpec,
     SectionSpec,
     _blocks,
     _list,
@@ -89,7 +92,8 @@ from .pagetypes.core.pagetype import PageType
 
 
 # --- Element-level FSMs (a list element's own tiny lifecycle) -----------------
-# Named distinctly from production so their diagram labels and cache identity never collide.
+# Named distinctly from production so their diagram labels and registered class names never
+# collide: python-statemachine registers each class it builds under its qualname.
 _STEP_FSM = ElementFSMSpec(
     name="TestStep",
     initial="todo", states=("todo", "done", "skipped"),
@@ -270,7 +274,13 @@ TEST_LIFECYCLE = PageType(
     name="Lifecycle fixture",
     description="Test fixture: a rich status FSM with required-content gates, agency, guards, questions, and a pinned auto-child.",
     sections=(
-        SectionSpec("summary", "Summary", (_prose("body", description="the intent (gates beginPlanning)"),)),
+        # A wrapped multi-line instruction, which no other fixture carries: it is what makes a field
+        # description render as an indented block rather than inline after its marker, in the
+        # generated docs and everywhere else a field's instruction is echoed.
+        SectionSpec("summary", "Summary", (_prose("body", description="""
+            the intent (gates beginPlanning).
+            A second line, so the instruction wraps.
+            """),)),
         SectionSpec("parts", "Parts", (
             _list("items", element_fields=("name",), description="parts touched (gates beginImplementation)"),
         )),
@@ -332,9 +342,12 @@ TEST_LIFECYCLE = PageType(
     # Workspace-guidance fields for the tests: one shown across two statuses, one at a single status,
     # and one at the initial status.
     workspace_guidance=(
-        WorkspaceGuidanceSpec("buildTool", ("building", "review"), "the build tool this workspace uses"),
-        WorkspaceGuidanceSpec("reviewHint", ("review",), "a hint shown while reviewing"),
-        WorkspaceGuidanceSpec("draftHint", ("draft",), "a hint shown while drafting"),
+        WorkspaceGuidanceSpec("buildTool", ("building", "review"), "the build tool this workspace uses",
+                              "BUILD TOOL GUIDANCE: "),
+        WorkspaceGuidanceSpec("reviewHint", ("review",), "a hint shown while reviewing",
+                              "REVIEW HINT GUIDANCE: "),
+        WorkspaceGuidanceSpec("draftHint", ("draft",), "a hint shown while drafting",
+                              "DRAFT HINT GUIDANCE: "),
     ),
 )
 

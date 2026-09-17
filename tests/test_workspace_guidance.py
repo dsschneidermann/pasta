@@ -14,6 +14,12 @@ from fastmcp.exceptions import ToolError
 import src.server as server
 from src.errors import ValidationError
 from src.model import Workspace
+from src.pagetypes._stage_guidance import PAGE_STATUS_GUIDANCE
+from src.pagetypes._workspace_guidance import (
+    GROUNDING_TOOL_LABEL,
+    MERGE_PROCESS_LABEL,
+    TESTING_TOOL_LABEL,
+)
 from src.pagetypes.core.specs import FSMSpec, WorkspaceGuidanceSpec, status_guidance
 from src.pagetypes.core.fields import SectionSpec
 from src.pagetypes.core.pagetype import PageType
@@ -93,13 +99,14 @@ def _building_lifecycle(mcp):
 
 # --- WorkspaceGuidanceSpec construction --------------------------------------
 def test_workspace_guidance_spec_holds_its_fields():
-    spec = WorkspaceGuidanceSpec("mergeProcess", ("review",), "a desc")
-    assert (spec.field, spec.guidance_for, spec.description) == ("mergeProcess", ("review",), "a desc")
+    spec = WorkspaceGuidanceSpec("mergeProcess", ("review",), "a desc", "A LABEL: ")
+    assert (spec.field, spec.guidance_for, spec.description, spec.label) == (
+        "mergeProcess", ("review",), "a desc", "A LABEL: ")
 
 
 def test_workspace_guidance_spec_does_not_validate_at_construction():
     # A malformed one (empty field, no statuses) constructs without raising - validation is deferred.
-    spec = WorkspaceGuidanceSpec("", (), "")
+    spec = WorkspaceGuidanceSpec("", (), "", "")
     assert spec.field == "" and spec.guidance_for == ()
 
 
@@ -116,51 +123,84 @@ def test_workspace_guidance_empty_when_none_declared():
 # --- validate_workspace_guidance ---------------------------------------------
 def test_validate_workspace_guidance_flags_each_problem():
     unknown_status = _wg_type("wg-a", ("draft",),
-                              WorkspaceGuidanceSpec("f", ("nope",), "d"))
-    empty_for = _wg_type("wg-b", ("draft",), WorkspaceGuidanceSpec("g", (), "d"))
-    empty_field = _wg_type("wg-c", ("draft",), WorkspaceGuidanceSpec("", ("draft",), "d"))
-    empty_desc = _wg_type("wg-d", ("draft",), WorkspaceGuidanceSpec("h", ("draft",), ""))
+                              WorkspaceGuidanceSpec("f", ("nope",), "d", "L: "))
+    empty_for = _wg_type("wg-b", ("draft",), WorkspaceGuidanceSpec("g", (), "d", "L: "))
+    empty_field = _wg_type("wg-c", ("draft",), WorkspaceGuidanceSpec("", ("draft",), "d", "L: "))
+    empty_desc = _wg_type("wg-d", ("draft",), WorkspaceGuidanceSpec("h", ("draft",), "", "L: "))
+    empty_label = _wg_type("wg-e", ("draft",), WorkspaceGuidanceSpec("i", ("draft",), "d", ""))
     errors = validate_workspace_guidance({t.tag: t for t in
-                                          (unknown_status, empty_for, empty_field, empty_desc)})
+                                          (unknown_status, empty_for, empty_field, empty_desc,
+                                           empty_label)})
     joined = "\n".join(errors)
     assert "wg-a" in joined and "unknown status 'nope'" in joined
     assert "wg-b" in joined and "no guidance_for" in joined
     assert "wg-c" in joined and "empty field name" in joined
     assert "wg-d" in joined and "empty description" in joined
+    assert "wg-e" in joined and "empty label" in joined
 
 
 def test_validate_workspace_guidance_flags_disagreeing_descriptions():
-    a = _wg_type("wg-a", ("draft",), WorkspaceGuidanceSpec("shared", ("draft",), "one"))
-    b = _wg_type("wg-b", ("draft",), WorkspaceGuidanceSpec("shared", ("draft",), "two"))
+    a = _wg_type("wg-a", ("draft",), WorkspaceGuidanceSpec("shared", ("draft",), "one", "L: "))
+    b = _wg_type("wg-b", ("draft",), WorkspaceGuidanceSpec("shared", ("draft",), "two", "L: "))
     errors = validate_workspace_guidance({a.tag: a, b.tag: b})
     assert any("description disagrees" in e for e in errors)
 
 
+def test_validate_workspace_guidance_flags_disagreeing_labels():
+    # A shared field read behind different wording per page type is the drift this rule stops.
+    a = _wg_type("wg-a", ("draft",), WorkspaceGuidanceSpec("shared", ("draft",), "same", "ONE: "))
+    b = _wg_type("wg-b", ("draft",), WorkspaceGuidanceSpec("shared", ("draft",), "same", "TWO: "))
+    errors = validate_workspace_guidance({a.tag: a, b.tag: b})
+    assert any("label disagrees" in e for e in errors)
+
+
 def test_validate_workspace_guidance_clean_when_descriptions_agree():
-    a = _wg_type("wg-a", ("draft",), WorkspaceGuidanceSpec("shared", ("draft",), "same"))
-    b = _wg_type("wg-b", ("open", "draft"), WorkspaceGuidanceSpec("shared", ("open",), "same"))
+    a = _wg_type("wg-a", ("draft",), WorkspaceGuidanceSpec("shared", ("draft",), "same", "L: "))
+    b = _wg_type("wg-b", ("open", "draft"), WorkspaceGuidanceSpec("shared", ("open",), "same", "L: "))
     assert validate_workspace_guidance({a.tag: a, b.tag: b}) == []
 
 
 # --- aggregated load raise ---------------------------------------------------
 def test_validate_page_types_raises_on_bad_workspace_guidance():
-    bad = _wg_type("wg-bad", ("draft",), WorkspaceGuidanceSpec("f", ("missing",), "d"))
+    bad = _wg_type("wg-bad", ("draft",), WorkspaceGuidanceSpec("f", ("missing",), "d", "L: "))
     with pytest.raises(ValueError, match="unknown status 'missing'"):
         validate_page_types({bad.tag: bad})
 
 
+def test_validate_page_types_raises_on_a_missing_label():
+    bad = _wg_type("wg-nolabel", ("draft",), WorkspaceGuidanceSpec("f", ("draft",), "d", ""))
+    with pytest.raises(ValueError, match="empty label"):
+        validate_page_types({bad.tag: bad})
+
+
 def test_validate_page_types_clean_for_good_workspace_guidance():
-    good = _wg_type("wg-ok", ("draft",), WorkspaceGuidanceSpec("f", ("draft",), "d"))
+    good = _wg_type("wg-ok", ("draft",), WorkspaceGuidanceSpec("f", ("draft",), "d", "L: "))
     assert validate_page_types({good.tag: good}) is None
 
 
 # --- workspace_guidance (pure emission) ----------------------------------
 def test_workspace_guidance_emits_only_in_set_with_text():
     config = {"buildTool": "use pytest", "reviewHint": "look hard"}
-    assert workspace_guidance(LIFECYCLE, "building", config) == {"guidance_buildTool": "use pytest"}
+    assert workspace_guidance(LIFECYCLE, "building", config) == {
+        "guidance_buildTool": "BUILD TOOL GUIDANCE: use pytest"}
     # review is in both buildTool and reviewHint sets.
     assert workspace_guidance(LIFECYCLE, "review", config) == {
-        "guidance_buildTool": "use pytest", "guidance_reviewHint": "look hard"}
+        "guidance_buildTool": "BUILD TOOL GUIDANCE: use pytest",
+        "guidance_reviewHint": "REVIEW HINT GUIDANCE: look hard"}
+
+
+def test_workspace_guidance_prefixes_with_the_declared_label():
+    # The wording comes off the spec, so emission reads it rather than deriving one from the field.
+    labelled = _wg_type("wg-l", ("draft",),
+                        WorkspaceGuidanceSpec("f", ("draft",), "d", "SOME LABEL: "))
+    assert workspace_guidance(labelled, "draft", {"f": "x"}) == {"guidance_f": "SOME LABEL: x"}
+
+
+def test_production_guidance_fields_declare_their_labels():
+    # The three shared fields carry fixed labels rather than ones derived from the field name.
+    assert MERGE_PROCESS_LABEL == "MERGE PROCESS GUIDANCE: "
+    assert TESTING_TOOL_LABEL == "TESTING TOOL GUIDANCE: "
+    assert GROUNDING_TOOL_LABEL == "GROUNDING TOOL GUIDANCE: "
 
 
 def test_workspace_guidance_skips_out_of_set_absent_and_empty():
@@ -225,14 +265,14 @@ def test_next_actions_injects_guidance_for_focused_page(store):
 
     store.set_page_status(wid, pid, "review")
     actions = store.next_actions(wid, pid)
-    assert actions["guidance_buildTool"] == "use pytest"          # review in buildTool's set
-    assert actions["guidance_reviewHint"] == "look hard"          # review in reviewHint's set
-    # Stage guidance for the focused page is included too.
-    assert actions["guidance"] == status_guidance(LIFECYCLE.fsm, "review")
+    assert actions["guidance_buildTool"] == "BUILD TOOL GUIDANCE: use pytest"
+    assert actions["guidance_reviewHint"] == "REVIEW HINT GUIDANCE: look hard"
+    # Stage guidance for the focused page is included too, behind its own label.
+    assert actions["guidance"] == PAGE_STATUS_GUIDANCE + status_guidance(LIFECYCLE.fsm, "review")
 
     store.set_page_status(wid, pid, "building")
     actions = store.next_actions(wid, pid)
-    assert actions["guidance_buildTool"] == "use pytest"          # building in buildTool's set
+    assert actions["guidance_buildTool"] == "BUILD TOOL GUIDANCE: use pytest"
     assert "guidance_reviewHint" not in actions                   # building not in reviewHint's set
 
 
@@ -255,10 +295,10 @@ def test_set_workspace_guidance_tool_and_response_keys(mcp):
     # A subsequent write response carries guidance_buildTool (page is at `building`), inside `next`.
     written = _mutate_server(mcp, {"workspaceId": wid, "pageId": pid,
                                    "commands": [{"command": "setSummary", "args": {"text": "S2"}}]})
-    assert written["next"]["guidance_buildTool"] == "use pytest"
+    assert written["next"]["guidance_buildTool"] == "BUILD TOOL GUIDANCE: use pytest"
     # `next` is the payload nextActions returns for the page, so the two agree by construction.
     actions = call(mcp, "nextActions", {"workspaceId": wid, "pageId": pid})
-    assert actions["guidance_buildTool"] == "use pytest"
+    assert actions["guidance_buildTool"] == "BUILD TOOL GUIDANCE: use pytest"
 
 
 def test_create_page_response_carries_workspace_guidance(mcp):
@@ -266,7 +306,7 @@ def test_create_page_response_carries_workspace_guidance(mcp):
     call(mcp, "setWorkspaceGuidance", {"workspaceId": wid, "field": "draftHint", "text": "drafting"})
     created = call(mcp, "createPage", {"workspaceId": wid, "type": "test-lifecycle", "title": "F"})
     assert created["status"] == "draft"
-    assert created["next"]["guidance_draftHint"] == "drafting"   # draft is in draftHint's set
+    assert created["next"]["guidance_draftHint"] == "DRAFT HINT GUIDANCE: drafting"
 
 
 def test_set_workspace_guidance_unknown_field_is_tool_error(mcp):

@@ -14,6 +14,11 @@ strips it exactly as it does a field description.
 """
 
 
+# The label the focused page's stage guidance is read behind wherever it is surfaced, so it is
+# told apart from the workspace guidance texts alongside it.
+PAGE_STATUS_GUIDANCE = "PAGE STATUS GUIDANCE: "
+
+
 # --- feature-brief -----------------------------------------------------------
 GROUNDING = """
 grounding - the summary is written and nothing else is known yet. This status is for

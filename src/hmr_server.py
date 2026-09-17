@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import traceback
 from asyncio import Event, Lock, TaskGroup
 from contextlib import asynccontextmanager, suppress
 from importlib import import_module
@@ -44,7 +45,7 @@ from fastmcp import FastMCP
 from fastmcp.utilities.lifespan import combine_lifespans
 from mcp.server.session import ServerSession
 from reactivity import async_effect, derived
-from reactivity.hmr.core import HMR_CONTEXT, AsyncReloader
+from reactivity.hmr.core import HMR_CONTEXT, AsyncReloader, ErrorFilter
 from reactivity.hmr.hooks import call_post_reload_hooks, call_pre_reload_hooks
 from starlette.applications import Starlette
 from starlette.routing import Mount
@@ -64,6 +65,28 @@ _LIVE_REFRESH_FILE = str(Path(__file__).resolve().parent / "hmr_live_refresh.py"
 # console next to uvicorn's own output. A standalone module logger at INFO would be
 # dropped: uvicorn configures only its own loggers, not the root logger.
 logger = logging.getLogger("uvicorn.error")
+
+
+# --- Reload failure reporting ----------------------------------------------------------
+class _LoggingErrorFilter(ErrorFilter):
+    """Restate a swallowed reload failure through the dev console's error logger.
+
+    hmr hands a module whose re-exec raised to ``sys.excepthook`` and then swallows it, so the dev
+    server keeps running - leaving a bare traceback among uvicorn's own lines, at no level and
+    saying nothing of what the failure cost. What the reader needs is the consequence: the edit did
+    not take, so the modules loaded before it are the ones still serving.
+
+    Only that summary is logged. The traceback itself still reaches ``sys.excepthook``, which is
+    what tees it to the reload log, so nothing is lost and nothing is printed twice.
+    """
+
+    def __exit__(self, exc_type, exc_value, traceback_):
+        if exc_value is not None:
+            reason = "".join(traceback.format_exception_only(exc_type, exc_value)).strip()
+            logger.error(
+                "[HMR] reload FAILED - the edit did not take, and the modules loaded before it "
+                "are still serving:\n%s", reason)
+        return super().__exit__(exc_type, exc_value, traceback_)
 
 
 # --- MCP session capture ---------------------------------------------------------------
@@ -189,10 +212,15 @@ def build_dev_app() -> Starlette:
     class Reloader(AsyncReloader):
         def __init__(self):
             super().__init__(_PACKAGE_DIR, includes=[_PACKAGE_DIR], excludes=[_LIVE_REFRESH_FILE])
+            # Every re-exec is wrapped in this filter, so reporting belongs here. Keep the frame
+            # exclusions the base built.
+            self.error_filter = _LoggingErrorFilter(*self.error_filter.exclude_filenames)
             self.error_filter.exclude_filenames.add(__file__)
 
         def on_changes(self, files):
-            # Reload the changed modules (reactive propagation), then refresh browsers.
+            # Reload the changed modules (reactive propagation), then refresh browsers. The refresh
+            # is unconditional, a failed reload included: what a tab should land on then is the
+            # refusal, and since that page keeps the socket it is also how the tab recovers.
             super().on_changes(files)
             with suppress(RuntimeError):
                 asyncio.get_running_loop().create_task(ws_reloader.refresh())

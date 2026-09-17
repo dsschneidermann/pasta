@@ -15,12 +15,18 @@ from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastmcp import FastMCP
 from fastmcp.utilities.lifespan import combine_lifespans
 from fastmcp.exceptions import ToolError
+from fastmcp.server.middleware import Middleware, MiddlewareContext
 
 from . import cleanup
 from .describe import describe_mutations, describe_page_type
 from .errors import PastaError
 from .hmr_live_refresh import ws_reloader
-from .pagetypes._registry import get_page_type, registered_tags, validate_registry
+from .pagetypes._registry import (
+    declaration_errors,
+    get_page_type,
+    registered_pagetypes,
+    validate_registry,
+)
 from .render import escape_markdown, render_workspace_links
 from .render_html import md2html
 from .serialize import page_to_dict
@@ -53,6 +59,37 @@ app.mount("/static", StaticFiles(directory="src/static"), name="static")
 app.mount("/sphinx", StaticFiles(directory="docsite/_build/html"), name="sphinx")
 
 templates = Jinja2Templates(directory="src/templates")
+
+
+# --- Declaration quarantine --------------------------------------------------
+# Validating in this module's body guards the moment it executes, not the surface it goes on to
+# serve. Under hot reload the two come apart: the page types can reload invalid while this module's
+# own re-exec fails, leaving the objects built by the last good exec mounted and answering out of a
+# registry that no longer validates. So ask again per request, against the live registry, at the
+# two points every caller passes through - which is what lets a gate hold even from a stale module.
+# Neither needs a reset: a reload that declares valid types simply answers None, and a cold start
+# still fails outright above.
+#
+# Registered ahead of `add_no_cache_headers` so that one stays the outer middleware and stamps this
+# response too, since a cached refusal would outlive the fix.
+@app.middleware("http")
+async def refuse_invalid_declarations(request: Request, call_next):
+    errors = declaration_errors()
+    # The refusal page renders with the stylesheet and theme assets served from /static.
+    if errors is None or request.url.path.startswith("/static"):
+        return await call_next(request)
+    return templates.TemplateResponse(
+        request=request,
+        name="error.html",
+        context={
+            "message": "The page-type declarations are invalid; the wiki is not being served.",
+            "trace": ("The page-type declarations are invalid, so this server is refusing to serve "
+                      "rather than answer out of them:\n\n"
+                      f"{errors}\n\n"
+                      "Fix the declaration and save - the reload will bring this page back."),
+        },
+        status_code=503,
+    )
 
 
 # --- No HTTP caching ---------------------------------------------------------
@@ -232,6 +269,33 @@ async def http_exception_handler(request: Request, exc: InternalError):
 app.mount("/pasta", mcp_app)  # MCP endpoint at /pasta/mcp
 
 
+class _RefuseInvalidDeclarations(Middleware):
+    """The tool-call half of the declaration quarantine above.
+
+    Hung on the call rather than on each tool, so it covers any tool added later, and not on the
+    handshake, so a client can still connect while the surface is down. The refusal carries the
+    errors themselves: this surface is driven by an agent, which never sees the dev console and has
+    nowhere else to learn why the server stopped answering.
+    """
+
+    async def on_call_tool(self, context: MiddlewareContext, call_next):
+        errors = declaration_errors()
+        if errors is None:
+            return await call_next(context)
+        # Resolved from the running server's package rather than the caller's cwd: a caller is
+        # often working in a different checkout than the server it is talking to. The log holds the
+        # traceback behind these errors, which the aggregated message deliberately does not carry.
+        from ._hmr_debug import LOG_PATH
+        raise ToolError(
+            "The page-type declarations are invalid, so this server is refusing to serve rather "
+            f"than answer out of them:\n{errors}\n"
+            f"The full reload traceback is at {LOG_PATH}.\n"
+            "Fix the declaration and save; the reload restores the tools.")
+
+
+mcp.add_middleware(_RefuseInvalidDeclarations())
+
+
 @contextmanager
 def _guard_tool() -> Generator[None]:
     """Translate expected domain errors into client-visible tool errors."""
@@ -365,10 +429,11 @@ async def describePageType(type: str | None = None) -> dict[str, Any]:
     """Describe a page type's sections, fields, commands, and FSM. Omit `type` to list types."""
     with _guard_tool():
         if type is None:
-            return {"types": registered_tags()}
+            return {"types": list(registered_pagetypes())}
         page_type = get_page_type(type)
         if page_type is None:
-            raise ToolError(f"Unknown page type '{type}'. Registered: {', '.join(registered_tags())}.")
+            raise ToolError(
+                f"Unknown page type '{type}'. Registered: {', '.join(registered_pagetypes())}.")
         return describe_page_type(page_type)
 
 

@@ -6,7 +6,7 @@ nor a page type.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from textwrap import dedent
 from typing import Any
 
@@ -85,9 +85,13 @@ class FSMSpec:
     the terminal status in `legal_in`.
 
     `status_guidance` is the per-status stage instruction: what a page in that status is for and
-    what the work in it consists of. It is a tuple of `(status, text)` pairs, not a mapping,
-    because this spec is the `@lru_cache` key in `fsm._machine_class`. Leaving a status undeclared
-    is the normal case.
+    what the work in it consists of. It is a tuple of `(status, text)` pairs, not a mapping, which
+    keeps the spec hashable and comparable by value. Leaving a status undeclared is the normal
+    case.
+
+    `machine` and `machine_error` are filled in by the owning page type, which builds the machine
+    as it is declared (see `PageType.__post_init__`). Being set after construction, they take no
+    part in the spec's identity.
     """
     name: str
     initial: str
@@ -95,6 +99,9 @@ class FSMSpec:
     transitions: tuple[tuple[str, str, str, str], ...] = ()
     terminal_states: tuple[str, ...] = ()
     status_guidance: tuple[tuple[str, str], ...] = ()
+    # the built StateMachine subclass, or the definition error that stopped it (never both)
+    machine: Any = field(default=None, init=False, compare=False, repr=False)
+    machine_error: Exception | None = field(default=None, init=False, compare=False, repr=False)
 
     def __post_init__(self):
         # Setup only: normalize each guidance text as authored (dedent a
@@ -125,6 +132,10 @@ class ElementFSMSpec:
     For an element rendered as a task checkbox, `checkmark_done` names the state shown as a checked box
     `[x]`; the FSM's `initial` state is then the unchecked box `[ ]`, and every other state - and every
     element FSM that leaves this None - renders with no box.
+
+    `machine` and `machine_error` are filled in by a page type that declares this spec on one of its
+    list fields (see `PageType.__post_init__`). Being set after construction, they take no part in
+    the spec's identity, so one spec declared by several page types stays a single value.
     """
     name: str
     initial: str
@@ -132,6 +143,9 @@ class ElementFSMSpec:
     # (event, source, dest, agency)
     transitions: tuple[tuple[str, str, str, str], ...]
     checkmark_done: str | None = None
+    # the built StateMachine subclass, or the definition error that stopped it (never both)
+    machine: Any = field(default=None, init=False, compare=False, repr=False)
+    machine_error: Exception | None = field(default=None, init=False, compare=False, repr=False)
 
 
 @dataclass(frozen=True)
@@ -201,7 +215,12 @@ class WorkspaceGuidanceSpec:
     membership. `description`, non-empty, says what the field means and must match across any types
     that share the field. Construction does not validate; these rules are checked when the registry
     is validated at load.
+
+    `label`, non-empty, is the fixed wording the stored text is emitted behind so a reader can tell
+    the texts surfaced together apart; like `description` it must match across any types that share
+    the field, or the same text would be read behind different wording per page type.
     """
     field: str
     guidance_for: tuple[str, ...]
     description: str
+    label: str

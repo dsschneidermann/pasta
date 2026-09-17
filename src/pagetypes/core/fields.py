@@ -6,10 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from textwrap import dedent
 
-from .args import (
-    BlockKindSpec,
-    ElementBlocksSpec,
-)
+from .args import BlockKindSpec
 from .specs import BLOCKS, LIST, PROSE, SCALAR, TITLE_ELEMENT_FIELDS, ElementFSMSpec
 
 
@@ -27,6 +24,17 @@ class FieldSpec:
 
     def __post_init__(self):
         object.__setattr__(self, "description", dedent(self.description.strip("\n")).rstrip())
+
+
+@dataclass(frozen=True)
+class ElementBlocksSpec:
+    """A LIST element field that holds an ordered array of blocks instead of a scalar value.
+
+    `block_kinds` is the closed vocabulary the field accepts - the same BlockKindSpec tuple a
+    page-level blocks field declares, which is what makes the two levels one mechanism.
+    """
+    field: str
+    block_kinds: tuple[BlockKindSpec, ...]
 
 
 def get_element_blocks(self: FieldSpec, element_field: str) -> ElementBlocksSpec | None:
