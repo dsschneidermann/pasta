@@ -1,30 +1,30 @@
 """Combined hot-module-reload dev server for pasta.
 
 Runs one uvicorn server, one file watcher and one reactive (HMR) context that serve
-both surfaces of src.server with in-process hot reload - no process respawn:
+both surfaces of `src.server` with in-process hot reload - no process respawn:
 
-* FastMCP tools  -> a stable proxy (base_app). The reloaded src.server.mcp
+* FastMCP tools  -> a stable proxy (`base_app`). The reloaded `src.server.mcp`
   is mounted under it; on a source change the old mount is swapped for the reloaded
   one and connected MCP client sessions are sent tools/list_changed, so sessions
   SURVIVE the reload instead of dropping.
 
 * FastAPI HTML   -> a reactive dispatcher that forwards every request to the freshly
-  reloaded src.server.app. On a source change connected browsers are told to
-  reload over the existing /ws/reloader WebSocket (ws_reloader.refresh).
+  reloaded `src.server.app`. On a source change connected browsers are told to
+  reload over the existing /ws/reloader WebSocket (`ws_reloader.refresh`).
 
 This merges the two reference patterns - uvicorn-hmr (serve a reloaded ASGI app +
 browser refresh) and mcp-hmr (stable proxy + session-preserving tool swap) - into
 one module, started from main.py.
 
-The hot part is powered by hmr (reactivity.hmr): the reloader installs an import
-finder so src.server and its submodules load as reactive modules that
+The hot part is powered by hmr (`reactivity.hmr`): the reloader installs an import
+finder so `src.server` and its submodules load as reactive modules that
 re-execute in place when their files change, propagating along the dependency graph.
 
 Two brittleness notes (dev-only tool):
-* It reaches into a few private fastmcp/mcp internals (base_app.providers /
-  FastMCPProvider for mount/unmount, the constructor of mcp.server.connection.Connection
+* It reaches into a few private fastmcp/mcp internals (`base_app.providers` /
+  `FastMCPProvider` for mount/unmount, the constructor of `mcp.server.connection.Connection`
   for connection capture). These changed across fastmcp versions; revisit on a fastmcp upgrade.
-* src.server and src.cleanup must be imported ONLY through the
+* `src.server` and `src.cleanup` must be imported ONLY through the
   reloader's finder (never at module top level), or the hot reload silently becomes
   a no-op.
 """
@@ -75,12 +75,12 @@ logger = logging.getLogger("uvicorn.error")
 class _LoggingErrorFilter(ErrorFilter):
     """Restate a swallowed reload failure through the dev console's error logger.
 
-    hmr hands a module whose re-exec raised to sys.excepthook and then swallows it, so the dev
+    hmr hands a module whose re-exec raised to `sys.excepthook` and then swallows it, so the dev
     server keeps running - leaving a bare traceback among uvicorn's own lines, at no level and
     saying nothing of what the failure cost. What the reader needs is the consequence: the edit did
     not take, so the modules loaded before it are the ones still serving.
 
-    Only that summary is logged. The traceback itself still reaches sys.excepthook, which is
+    Only that summary is logged. The traceback itself still reaches `sys.excepthook`, which is
     what tees it to the reload log, so nothing is lost and nothing is printed twice.
     """
 

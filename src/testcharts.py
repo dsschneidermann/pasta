@@ -1,7 +1,7 @@
-"""Concrete ``StateChart`` classes for each hand-authored test page type.
+"""Concrete `StateChart` classes for each hand-authored test page type.
 
-The fixture counterpart of ``statecharts``. Under test mode ``registered_pagetypes()`` hands back
-the ``test-*`` fixtures, so doc generation runs over them and needs the same importable machine name
+The fixture counterpart of `statecharts`. Under test mode `registered_pagetypes()` hands back
+the `test-*` fixtures, so doc generation runs over them and needs the same importable machine name
 per type that the doc renderer resolves against. Binding them here rather than beside the production
 types keeps that module's names to the types the documentation site publishes.
 """

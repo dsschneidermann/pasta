@@ -1,13 +1,13 @@
 """Generate the per-page-type-state Sphinx docs and write them into the docsite.
 
-The content is produced purely by ``src.docsgen`` (unit-tested); this driver only does the
-I/O: it splits the emitted docs into one ``docsite/page-types/<tag>-<state>.md`` file each, plus a
-generated ``docsite/page-types/states.md`` toctree index, then prints what it wrote.
+The content is produced purely by `src.docsgen` (unit-tested); this driver only does the
+I/O: it splits the emitted docs into one `docsite/page-types/<tag>-<state>.md` file each, plus a
+generated `docsite/page-types/states.md` toctree index, then prints what it wrote.
 
     uv run python scripts/gen_page_type_docs.py
 
-It does NOT touch the hand-authored per-type overview docs (``page-types/<tag>.md``), and it does
-not delete previously generated files - remove a stale ``<tag>-<state>.md`` by hand if a state is
+It does NOT touch the hand-authored per-type overview docs (`page-types/<tag>.md`), and it does
+not delete previously generated files - remove a stale `<tag>-<state>.md` by hand if a state is
 ever dropped from a page type. Re-run after changing the page-type registry or the doc templates.
 """
 

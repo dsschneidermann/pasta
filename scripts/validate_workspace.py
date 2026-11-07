@@ -7,31 +7,31 @@ change and where.
 
     uv run python scripts/validate_workspace.py [PATH]
 
-PATH defaults to ``.pasta-data/ws_mrteq0c5-238cf6.json`` (relative to the repo
+PATH defaults to `.pasta-data/ws_mrteq0c5-238cf6.json` (relative to the repo
 root). Exit code is 0 when the file is clean and 1 when any problem is found, so
 the script is usable as a check.
 
 What it checks
 --------------
-* **Child existence** - every id in a page's ``child_ids`` resolves to a page.
+* **Child existence** - every id in a page's `child_ids` resolves to a page.
 * **Unique filing** - no page is listed as a child by two parents, and no page is
-  both a root and someone's child (the page tree renders from ``root_page_ids`` +
-  ``child_ids``, so this list structure is treated as authoritative).
-* **Parent back-reference** - each page's ``parent_id`` agrees with where the page
-  is actually filed (its listed parent, or ``null`` for a root).
+  both a root and someone's child (the page tree renders from `root_page_ids` +
+  `child_ids`, so this list structure is treated as authoritative).
+* **Parent back-reference** - each page's `parent_id` agrees with where the page
+  is actually filed (its listed parent, or `null` for a root).
 * **Reachability** - every page is filed exactly once (a root, or some parent's
   child); pages filed nowhere are orphans. The server's hourly cleanup sweep
   treats these as prunable after a 5-day grace period - see the "Scheduled
   workspace cleanup" architecture page.
 * **root_page_ids** - its entries exist and are genuinely parentless, and every
   parentless page appears in it.
-* **Unique ids** - no duplicated page-id key in the ``pages`` object.
-* **Links** - every ``links[].to`` on a page resolves to an existing page.
-* **Empty tocs** - a ``toc`` page with no non-archived children and no section
+* **Unique ids** - no duplicated page-id key in the `pages` object.
+* **Links** - every `links[].to` on a page resolves to an existing page.
+* **Empty tocs** - a `toc` page with no non-archived children and no section
   content is flagged as removable.
 
 The line numbers are exact for a workspace file written by the store, which
-serializes with ``json.dumps(..., indent=2)`` (one token per line).
+serializes with `json.dumps(..., indent=2)` (one token per line).
 """
 
 from __future__ import annotations
@@ -73,8 +73,8 @@ class PageIndex:
 def build_index(text: str) -> tuple[dict[str, PageIndex], list[tuple[str, int]]]:
     """Scan the raw file text into a per-page line index.
 
-    Returns ``(index, duplicate_keys)`` where ``duplicate_keys`` lists every page
-    id that appears more than once as a key in the ``pages`` object (JSON parsing
+    Returns `(index, duplicate_keys)` where `duplicate_keys` lists every page
+    id that appears more than once as a key in the `pages` object (JSON parsing
     silently keeps only the last, so this is caught here from the raw text).
     """
     lines = text.split("\n")
@@ -114,7 +114,7 @@ def build_index(text: str) -> tuple[dict[str, PageIndex], list[tuple[str, int]]]
 def _scan_block(lines: list[str], start: int, end: int, idx: PageIndex) -> None:
     """Fill in parent_id / child / link line numbers from one page block.
 
-    ``start`` / ``end`` are 1-based inclusive line numbers of the page block.
+    `start` / `end` are 1-based inclusive line numbers of the page block.
     """
     k = start  # skip the key line, scan the fields
     while k < end:
@@ -137,7 +137,7 @@ def _scan_block(lines: list[str], start: int, end: int, idx: PageIndex) -> None:
 
 def _scan_string_array(lines: list[str], open_line: int, end: int,
                        out: list[tuple[str, int]]) -> int:
-    """Collect `"value"` element lines of a string array that opens on ``open_line``.
+    """Collect `"value"` element lines of a string array that opens on `open_line`.
 
     Returns the line after the array's closing `]`.
     """
@@ -154,7 +154,7 @@ def _scan_string_array(lines: list[str], open_line: int, end: int,
 
 def _scan_link_array(lines: list[str], open_line: int, end: int,
                      out: list[tuple[str, int]]) -> int:
-    """Collect each link object's ``to`` id + line from a links array.
+    """Collect each link object's `to` id + line from a links array.
 
     Returns the line after the array's closing `]`.
     """
@@ -182,7 +182,7 @@ def _is_empty_value(value: Any) -> bool:
 
 
 def _has_section_content(sections: dict[str, Any]) -> bool:
-    """True if any field anywhere in ``sections`` holds a non-empty value."""
+    """True if any field anywhere in `sections` holds a non-empty value."""
     for fields in sections.values():
         if not isinstance(fields, dict):
             if not _is_empty_value(fields):

@@ -4,33 +4,33 @@ Each type here is a purpose-built demonstration of one capability cluster of the
 system, deliberately small and named for the mechanic it exercises rather than any production
 role:
 
-  - ``test-fields``    - every non-block field kind (scalar, enum-scalar, prose, list with a
+  - `test-fields`    - every non-block field kind (scalar, enum-scalar, prose, list with a
                          required + optional element field) and the content-mutation patterns over
                          them (set, add + positioned insert, remove, reorder, set-element-field).
-  - ``test-blocks``    - the ``blocks`` field: every block kind, the inline-run grammar, in-place
-                         set, reorder, remove; a single terminal ``active`` status.
-  - ``test-element-blocks`` - block-bearing element fields: a list whose elements carry blocks
-                         under a per-field kind restriction (``snippet`` code-only, ``detail``
+  - `test-blocks`    - the `blocks` field: every block kind, the inline-run grammar, in-place
+                         set, reorder, remove; a single terminal `active` status.
+  - `test-element-blocks` - block-bearing element fields: a list whose elements carry blocks
+                         under a per-field kind restriction (`snippet` code-only, `detail`
                          paragraph/code/list), an element FSM, and a draft→ready FSM whose
-                         ``markReady`` requires the list - so the draft-only lock on the
-                         element-scoped block commands and their absence from the ``do`` list are
+                         `markReady` requires the list - so the draft-only lock on the
+                         element-scoped block commands and their absence from the `do` list are
                          both observable.
-  - ``test-flow``      - a simple status FSM (draft → open → closed → open) with a state and event
-                         that share the name ``open``, and a COMPOUND ``close`` that records a
+  - `test-flow`      - a simple status FSM (draft → open → closed → open) with a state and event
+                         that share the name `open`, and a COMPOUND `close` that records a
                          commit AND transitions.
-  - ``test-lifecycle`` - a rich status FSM: required-content preconditions, agency, a multi-source
-                         ``abandon`` to a terminal status, a questions element-FSM + escalate, a
-                         pinned auto-child, a ``beginImplementation`` guarded on that child's page
-                         status (page-status guard), and a ``ship`` guarded on that child's element
+  - `test-lifecycle` - a rich status FSM: required-content preconditions, agency, a multi-source
+                         `abandon` to a terminal status, a questions element-FSM + escalate, a
+                         pinned auto-child, a `beginImplementation` guarded on that child's page
+                         status (page-status guard), and a `ship` guarded on that child's element
                          states (element-status guards).
-  - ``test-child``     - the pinned auto-child of ``test-lifecycle``: two element FSMs (todo/done
+  - `test-child`     - the pinned auto-child of `test-lifecycle`: two element FSMs (todo/done
                          steps and pending/passed/failed checks, covering every checkbox render
-                         case), a ``legal_in`` content lock where structural edits are draft-only
-                         but element-status marks stay legal in ``ready``, a ``decisions``
-                         blocks field whose ``addDecision`` carries a cross-page ref check to the
-                         parent's questions, and a ``markReady`` gated on BOTH required content
+                         case), a `legal_in` content lock where structural edits are draft-only
+                         but element-status marks stay legal in `ready`, a `decisions`
+                         blocks field whose `addDecision` carries a cross-page ref check to the
+                         parent's questions, and a `markReady` gated on BOTH required content
                          (steps) and a PARENT-state guard - the pair behind parent-gated stage
-                         exposure, where a child stays silent in ``next_actions`` until its parent
+                         exposure, where a child stays silent in `next_actions` until its parent
                          reaches the stage that unlocks it.
 
 Tests assert against these fixtures so a production page type can be enriched freely without
@@ -38,15 +38,15 @@ churning the suite; production types are trusted to reuse these same patterns an
 through the generic invariants, the registered set, the description directive, and doc generation.
 
 Under test mode these types stand in for the production registry (see src.pagetypes._registry): they
-are what ``registered_pagetypes()`` hands back, so the store, renderer, and pure core operate on a
-test page like any other and the ``describePageType`` listing advertises them. Outside test mode they
+are what `registered_pagetypes()` hands back, so the store, renderer, and pure core operate on a
+test page like any other and the `describePageType` listing advertises them. Outside test mode they
 neither resolve nor list. Their status machines are bound in src.testcharts rather than beside the
 production ones, so doc generation runs over them too without the documentation site ever naming a
 fixture.
 
 Command DECLARATION flows through the SAME shared command-helper factories the production types use
-(``set_prose_cmd`` / ``set_scalar_cmd`` / ``list_cmds`` / ``element_cmds`` / ``set_element_field_cmd`` /
-``blocks_cmds`` / ``element_blocks_cmds`` / ``transition_cmd`` / ``transition_on_add_cmd``,
+(`set_prose_cmd` / `set_scalar_cmd` / `list_cmds` / `element_cmds` / `set_element_field_cmd` /
+`blocks_cmds` / `element_blocks_cmds` / `transition_cmd` / `transition_on_add_cmd`,
 imported from
 src.pagetypes) - so a fixture reads like a production type and doubles as coverage of those
 helpers, while its command surface (names, args, legality, FSM edges, guards, ref-checks) stays

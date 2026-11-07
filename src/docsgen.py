@@ -1,23 +1,23 @@
 """Pure generation of Sphinx docs for every page type AND every one of its FSM states.
 
-For each registered page type this captures ``describe_page_type`` (the type-level schema)
-and, for each reachable status, ``describe_mutations`` on a content-less page pinned at that
-status - then emits one Markdown page per page-type-state (``<tag>-<state>``): a
-``statemachine-diagram`` (``:format: dot``) navigated to the state via ``:events:`` (the
+For each registered page type this captures `describe_page_type` (the type-level schema)
+and, for each reachable status, `describe_mutations` on a content-less page pinned at that
+status - then emits one Markdown page per page-type-state (`<tag>-<state>`): a
+`statemachine-diagram` (`:format: dot`) navigated to the state via `:events:` (the
 shortest transition path that reaches it), the transitions legal out of the state (linked to
 the sibling state docs), and the authoring commands legal there.
 
 Everything here is pure - it reads the registry and returns strings, performing no I/O. The
-``scripts/gen_page_type_docs.py`` driver writes the returned docs into the docsite. Two design
+`scripts/gen_page_type_docs.py` driver writes the returned docs into the docsite. Two design
 points make the FSM walk trivial:
 
-- The ``StateMachine`` classes (``src.statecharts``) are guardless - required-content
-  preconditions and status-scoped command locks live in ``commands.py``, not the machine - so the
-  diagram directive can replay any ``:events:`` path with no content, and a plain breadth-first walk
-  over ``FSMSpec.transitions`` yields the path to every state.
-- To *enumerate* a state's outgoing transitions on a content-less page, ``describe_mutations`` is
-  called with ``ignore_requirements=True`` so a content-gated transition still reports available on
-  the topology alone; the ``legal_in`` status-lock still applies, so any status-scoped command lock
+- The `StateMachine` classes (`src.statecharts`) are guardless - required-content
+  preconditions and status-scoped command locks live in `commands.py`, not the machine - so the
+  diagram directive can replay any `:events:` path with no content, and a plain breadth-first walk
+  over `FSMSpec.transitions` yields the path to every state.
+- To *enumerate* a state's outgoing transitions on a content-less page, `describe_mutations` is
+  called with `ignore_requirements=True` so a content-gated transition still reports available on
+  the topology alone; the `legal_in` status-lock still applies, so any status-scoped command lock
   is documented truthfully.
 """
 
@@ -44,9 +44,9 @@ STATES_INDEX_STEM = "states"          # the generated toctree index (page-types/
 # --- FSM navigation ----------------------------------------------------------
 def reachable_states(fsm: FSMSpec) -> dict[str, list[str]]:
     """Every state reachable from the FSM's initial state, mapped to the shortest sequence of
-    event names that reaches it (breadth-first; the initial state maps to ``[]``).
+    event names that reaches it (breadth-first; the initial state maps to `[]`).
 
-    This event path is exactly what the ``statemachine-diagram`` ``:events:`` option replays to
+    This event path is exactly what the `statemachine-diagram` `:events:` option replays to
     navigate the (guardless) machine to the state, so the shortest path keeps the option short.
     """
     outgoing: dict[str, list[tuple[str, str]]] = {}
@@ -65,8 +65,8 @@ def reachable_states(fsm: FSMSpec) -> dict[str, list[str]]:
 
 
 def _seed_page(page_type: PageType, state: str) -> Page:
-    """A content-less page of ``page_type`` pinned at ``state`` - enough for ``describe_mutations``
-    to report the command surface (FSM topology + ``legal_in``) at that state."""
+    """A content-less page of `page_type` pinned at `state` - enough for `describe_mutations`
+    to report the command surface (FSM topology + `legal_in`) at that state."""
     return Page(
         id=f"{page_type.tag}:doc",
         type=page_type.tag,
@@ -252,10 +252,10 @@ def _render_state_doc(page_type: PageType, state: str, events: list[str],
 
 # --- Public API --------------------------------------------------------------
 def state_docs(page_type: PageType) -> dict[str, str]:
-    """One Markdown doc per reachable state of ``page_type``, keyed ``<tag>-<state>``.
+    """One Markdown doc per reachable state of `page_type`, keyed `<tag>-<state>`.
 
-    Captures ``describe_page_type`` once, then ``describe_mutations`` per state (with
-    ``ignore_requirements`` so content-gated transitions still enumerate) - the two captures the
+    Captures `describe_page_type` once, then `describe_mutations` per state (with
+    `ignore_requirements` so content-gated transitions still enumerate) - the two captures the
     docs are built from.
     """
     described = describe_page_type(page_type)
@@ -274,7 +274,7 @@ def state_docs(page_type: PageType) -> dict[str, str]:
 
 
 def all_state_docs(registry: dict[str, PageType] | None = None) -> dict[str, str]:
-    """Every page-type-state doc across the registry, keyed ``<tag>-<state>``."""
+    """Every page-type-state doc across the registry, keyed `<tag>-<state>`."""
     registry = registered_pagetypes() if registry is None else registry
     docs: dict[str, str] = {}
     for page_type in registry.values():
@@ -283,7 +283,7 @@ def all_state_docs(registry: dict[str, PageType] | None = None) -> dict[str, str
 
 
 def render_states_index(registry: dict[str, PageType] | None = None) -> str:
-    """The generated ``states.md`` - a toctree over every state doc, so they are reachable."""
+    """The generated `states.md` - a toctree over every state doc, so they are reachable."""
     registry = registered_pagetypes() if registry is None else registry
     lines = [
         "# Page-type states",

@@ -1,16 +1,16 @@
 """Pytest configuration for the pasta suite: put the whole run in *test mode*.
 
-Test mode (``src.pagetypes._registry.set_test_mode``) puts the hand-authored ``test-*`` fixtures
-(``src.testtypes``) in place of the PRODUCTION page types, which become off-limits: they do not
-resolve (``get_page_type``), are not listed (``registered_pagetypes`` - hence the
-``describePageType`` listing and doc-gen enumeration), and a page of one cannot be created. Any
-attempt raises ``ProductionTypeInTestError``, steering the author to exercise new capabilities on a
-fixture instead - always preferring an existing one. Entering the mode empties ``REGISTRY`` itself,
+Test mode (`src.pagetypes._registry.set_test_mode`) puts the hand-authored `test-*` fixtures
+(`src.testtypes`) in place of the PRODUCTION page types, which become off-limits: they do not
+resolve (`get_page_type`), are not listed (`registered_pagetypes` - hence the
+`describePageType` listing and doc-gen enumeration), and a page of one cannot be created. Any
+attempt raises `ProductionTypeInTestError`, steering the author to exercise new capabilities on a
+fixture instead - always preferring an existing one. Entering the mode empties `REGISTRY` itself,
 so a test cannot depend on a production type by reading the map directly either.
 
 The flag is set here at import, ahead of collection, because a test module resolves the fixture page
 types it works on at module level. Nothing restores it: the flag lives for the process, and the
-process is the run. A test that needs the production types asks for the ``production_mode`` fixture
+process is the run. A test that needs the production types asks for the `production_mode` fixture
 below.
 """
 
@@ -20,7 +20,7 @@ from src.event_cache import set_cache_disabled
 from src.pagetypes._registry import set_test_mode
 
 set_test_mode(True)
-# A test that exercises the event cache asks for the ``event_cache`` fixture below.
+# A test that exercises the event cache asks for the `event_cache` fixture below.
 set_cache_disabled(True)
 
 

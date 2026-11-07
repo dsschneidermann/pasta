@@ -1,7 +1,7 @@
 """Entrypoint for the pasta MCP server.
 
 Runs as an HTTP server on port 8000 by default with hot module reload (see
-``src.hmr_server``); pass ``--stdio`` to run over stdio instead (for an MCP client
+`src.hmr_server`); pass `--stdio` to run over stdio instead (for an MCP client
 that launches the server as a subprocess).
 """
 

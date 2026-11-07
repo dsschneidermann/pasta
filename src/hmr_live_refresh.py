@@ -1,12 +1,12 @@
 """Browser live-reload WebSocket connection manager.
 
-This module is deliberately kept OUT of the hot-reload set: ``src/hmr_server.py``
+This module is deliberately kept OUT of the hot-reload set: `src/hmr_server.py`
 excludes it from the reactive import finder. It holds live browser WebSocket
-connections as in-process state (``ws_reloader.active``); if it were re-executed on
+connections as in-process state (`ws_reloader.active`); if it were re-executed on
 every source change, that state would be dropped and browser auto-refresh would
 silently stop working. The manager therefore lives here, imported by both the
-reactively-reloaded ``src.server`` (routes + mutation refreshes) and the stable
-``src.hmr_server`` (file-change refreshes), so a single instance survives reloads.
+reactively-reloaded `src.server` (routes + mutation refreshes) and the stable
+`src.hmr_server` (file-change refreshes), so a single instance survives reloads.
 """
 
 from __future__ import annotations

@@ -1,6 +1,6 @@
 """Tests for the page-status machine bindings (src.statecharts).
 
-Page machines are served by a module-level ``__getattr__`` derived from the registry, so there is
+Page machines are served by a module-level `__getattr__` derived from the registry, so there is
 no binding to keep in step with the page types. These cover what resolves and what does not.
 """
 

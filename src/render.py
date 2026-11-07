@@ -108,8 +108,8 @@ def checkbox_state(status: str | None, element_fsm: ElementFSMSpec | None) -> st
 
 
 def _checkbox(status: str | None, element_fsm: ElementFSMSpec | None) -> str:
-    """The task checkbox for an element's status: `[x] ` for a done element, `[ ] ` for an
-    unchecked one, and `` where the element carries no checkbox at all."""
+    """The task checkbox for an element's status: '[x] ' for a done element, '[ ] ' for an
+    unchecked one, and '' where the element carries no checkbox at all."""
     state = checkbox_state(status, element_fsm)
     return "[x] " if state == "done" else "[ ] " if state == "todo" else ""
 
